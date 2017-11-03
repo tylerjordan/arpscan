@@ -218,7 +218,10 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
                 pass
         if no_match:
             #print "Missing ARP on {0} | ARP: {1}|{2}".format(ip1, arp2['ip'], arp2['mac'])
-            missing_on_a_list.append("IP: " + arp2['ip'] + " | MAC: " + arp2['mac'] + " | FLAG: " + arp2['flag'])
+            if not arp2['flag']:
+                print "IP: {0} -> Bang!".format(arp2['ip'])
+            else:
+                missing_on_a_list.append("IP: " + arp2['ip'] + " | MAC: " + arp2['mac'] + " | FLAG: " + arp2['flag'])
 
     print "\n" + "-"*22
     print "- Comparison Results -"
@@ -240,6 +243,10 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
         print "\t" + item
     print "-"*100
     print "-----------------------------"
+    print "Total Both Permanent: {0}".format(len(both_perm_list))
+    print "Total ARP Discrepancies: {0}".format(len(discrep_list))
+    print "Total ARP on B, Not A: {0}".format(len(missing_on_a_list))
+    print "Total ARP on A, Not B: {0}".format(len(missing_on_b_list))
     print "Total Matching ARPs: {0}".format(str(good_count))
     print "-----------------------------\n"
 
