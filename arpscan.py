@@ -196,11 +196,11 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
     for item in discrep_list:
         print item
     print "-----------------------------"
-    print "----- ARPs NOT on A -----"
+    print "----- ARPs on B, NOT on A -----"
     for item in missing_on_a_list:
         print item
     print "-----------------------------"
-    print "----- ARPs NOT on B -----"
+    print "----- ARPs on A, NOT on B -----"
     for item in missing_on_b_list:
         print item
     print "-----------------------------"
