@@ -113,8 +113,15 @@ def get_arp_table(ip):
         # Capture ARP tables from both devices
         arpsw_response = jxmlease.parse_etree(dev.rpc.get_arp_table_information())
         for arptableentry in arpsw_response['arp-table-information']['arp-table-entry']:
-            #print "MAC: {0} -> IP: {1}".format(arptableentry['mac-address'].encode('utf-8'), arptableentry['ip-address'].encode('utf-8'))
-            arp_mac_listdict.append({'ip': arptableentry['ip-address'].encode('utf-8'), 'mac': arptableentry['mac-address'].encode('utf-8')})
+            #print "MAC: {0} -> IP: {1}".format(arptableentry['mac-address'].encode('utf-8'),
+            #  arptableentry['ip-address'].encode('utf-8'))
+            if 'none' in arptableentry['arp-table-entry-flag']:
+                arpflag = 'none'
+            else:
+                arpflag = 'perm_remote'
+            arp_mac_listdict.append({'ip': arptableentry['ip-address'].encode('utf-8'),
+                                     'mac': arptableentry['mac-address'].encode('utf-8'),
+                                     'flag': arpflag})
     # Return the listdict
     return arp_mac_listdict
 
@@ -124,6 +131,7 @@ def arpscan():
     print "- Loading ARP Tables -"
     print "-"*22
 
+    '''
     # CSV Testing Code
     router_a = 'arps-orig.csv'
     router_b = 'arps-mod.csv'
@@ -141,30 +149,31 @@ def arpscan():
             print "Issue populating ARP table from {0}".format(router_b)
     else:
         print "Issue populating ARP table for {0}".format(router_a)
-
-    # Router Code
     '''
+    # Router Code
+
     if ip1:
         print "Retrieving ARP table from {0}".format(ip1)
         arp_mac_listdict1 = get_arp_table(ip1)
         print "Successfully captured ARP table from {0}".format(ip1)
-        #print_listdict(arp_mac_listdict1)
+        print_listdict(arp_mac_listdict1)
         if ip2:
             print "Retrieving ARP table from {0}".format(ip2)
             arp_mac_listdict2 = get_arp_table(ip2)
             print "Successfully captured ARP table from {0}".format(ip2)
-            #print_listdict(arp_mac_listdict2)
-            compare_arp_tables(arp_mac_listdict1, arp_mac_listdict2, ip1, ip2)
+            print_listdict(arp_mac_listdict2)
+            #compare_arp_tables(arp_mac_listdict1, arp_mac_listdict2, ip1, ip2)
         else:
             print "Issue populating ARP table for {0}".format(ip1)
     else:
         print "Issue populating ARP table for {0}".format(ip2)
-    '''
+
 
 # Custom function for comparing ARP tables
 def compare_arp_tables(arptab1, arptab2, ip1, ip2):
     # Compare ARP Tables
-    match_count = 0
+    good_count = 0
+    both_perm_list = []
     discrep_list = []
     missing_on_a_list = []
     missing_on_b_list = []
@@ -176,12 +185,16 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
             if arp1['ip'] == arp2['ip']:
                 # If these records have the same MAC
                 if arp1['mac'] == arp2['mac']:
-                   # Exact Match
-                   match_count += 1
+                    # If these records have the same flag
+                    if arp1['flag'] == arp2['flag']:
+                        both_perm_list.append("IP: " + arp1['ip'] + "MAC:" + arp1['mac'] + "FLAG: " + arp1['flag'])
+                    else:
+                        # Good Match
+                        good_count += 1
                 # If these records have different MACs
                 else:
-                    #print "MAC Discrepancy - IP: {0} | {1} MAC: {2} | {3} MAC: {4}".format(arp1['ip'], ip1, arp1['mac'], ip2, arp2['mac'])
-                    discrep_list.append("IP: " + arp1['ip'] + " | MAC on A: " + arp1['mac'] + " | MAC on B: " + arp2['mac'])
+                    discrep_list.append("IP: " + arp1['ip'] + " | MAC on A: " + arp1['mac'] + " | MAC on B: " \
+                                        + arp2['mac'])
                 no_match = False
                 break
             # If these records have different IPs
@@ -190,7 +203,7 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
                 pass
         if no_match:
             #print "Missing ARP on {0} | ARP: {1}|{2}".format(ip2, arp1['ip'], arp1['mac'])
-            missing_on_b_list.append("IP: " + arp1['ip'] + " | MAC: " + arp1['mac'])
+            missing_on_b_list.append("IP: " + arp1['ip'] + " | MAC: " + arp1['mac'] + " | FLAG: " + arp1['flag'])
     # Compares B against A
     for arp2 in arptab2:
         no_match = True
@@ -202,11 +215,15 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
                 pass
         if no_match:
             #print "Missing ARP on {0} | ARP: {1}|{2}".format(ip1, arp2['ip'], arp2['mac'])
-            missing_on_a_list.append("IP: " + arp2['ip'] + " | MAC: " + arp2['mac'])
+            missing_on_a_list.append("IP: " + arp2['ip'] + " | MAC: " + arp2['mac'] + " | FLAG: " + arp2['flag'])
 
     print "\n" + "-"*22
     print "- Comparison Results -"
     print "-"*22
+    print "  - Both Perm ARPs -"
+    for item in both_perm_list:
+        print "\t" + item
+    print "-"*100
     print "  - ARP Discrepancies -"
     for item in discrep_list:
         print "\t" + item
