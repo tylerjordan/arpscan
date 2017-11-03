@@ -134,16 +134,16 @@ def arpscan():
     print "- Loading ARP Tables -"
     print "-"*22
 
-    '''
+
     # CSV Testing Code
-    router_a = 'arps-orig.csv'
-    router_b = 'arps-mod.csv'
+    router_a = 'ita_arp.csv'
+    router_b = 'itb_arp.csv'
     # Loads the following CSV into a list dictionary
     arp_mac_listdict1 = csvListDict(os.path.join(dir_path, router_a))
     if arp_mac_listdict1:
         print "Successfully loaded Test ARP table from {0}".format(router_a)
         #print_listdict(arp_mac_listdict1)
-        arp_mac_listdict2 = csvListDict(os.path.join(dir_path, 'arps-mod.csv'))
+        arp_mac_listdict2 = csvListDict(os.path.join(dir_path, router_b))
         if arp_mac_listdict2:
             print "Successfully loaded Test ARP table from {0}".format(router_b)
             #print_listdict(arp_mac_listdict2)
@@ -152,9 +152,9 @@ def arpscan():
             print "Issue populating ARP table from {0}".format(router_b)
     else:
         print "Issue populating ARP table for {0}".format(router_a)
-    '''
-    # Router Code
 
+    # Router Code
+    '''
     if ip1:
         print "Retrieving ARP table from {0}".format(ip1)
         arp_mac_listdict1 = get_arp_table(ip1)
@@ -170,7 +170,7 @@ def arpscan():
             print "Issue populating ARP table for {0}".format(ip1)
     else:
         print "Issue populating ARP table for {0}".format(ip2)
-
+    '''
 
 # Custom function for comparing ARP tables
 def compare_arp_tables(arptab1, arptab2, ip1, ip2):
@@ -240,7 +240,7 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
         print "\t" + item
     print "-"*100
     print "-----------------------------"
-    print "Total Matching ARPs: {0}".format(str(match_count))
+    print "Total Matching ARPs: {0}".format(str(good_count))
     print "-----------------------------\n"
 
 # A function to display a list dict in a "pretty" format
