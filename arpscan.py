@@ -102,6 +102,7 @@ def connect(ip):
     else:
         return dev
 
+# Function for collecting the ARP information from the Juniper devices
 def get_arp_table(ip):
     # ARP list dictionary
     arp_mac_listdict = []
@@ -145,15 +146,16 @@ def arpscan():
     odd_listdict = [(x, y) for x, y in pairs if x != y]
     '''
     compare_arp_tables(arp_mac_listdict1, arp_mac_listdict2, ip1, ip2)
-    compare_arp_tables(arp_mac_listdict2, arp_mac_listdict1, ip2, ip1)
 
 
 # Custom function for comparing ARP tables
 def compare_arp_tables(arptab1, arptab2, ip1, ip2):
     # Compare ARP Tables
     match_count = 0
-    descr_count = 0
-    miss_count = 0
+    discrep_list = []
+    missing_on_a_list = []
+    missing_on_b_list = []
+    # Compares A against B
     for arp1 in arptab1:
         no_match= True
         for arp2 in arptab2:
@@ -166,7 +168,7 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
                 # If these records have different MACs
                 else:
                     print "MAC Discrepancy - IP: {0} | {1} MAC: {2} | {3} MAC: {4}".format(arp1['ip'], ip1, arp1['mac'], ip2, arp2['mac'])
-                    descr_count += 1
+                    discrep_list.append("IP: " + arp1['ip'] + " | MAC on A: " + arp1['mac'] + " | MAC on B: " + arp2['mac'])
                 no_match = False
                 break
             # If these records have different IPs
@@ -175,12 +177,35 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
                 pass
         if no_match:
             print "Missing ARP on {0} | ARP: {1}|{2}".format(ip2, arp1['ip'], arp1['mac'])
-            miss_count += 1
+            missing_on_b_list.append("IP: " + arp1['ip'] + " | MAC: " + arp1['mac'])
+    # Compares B against A
+    for arp2 in arptab2:
+        no_match = True
+        for arp1 in arptab1:
+            if arp2['ip'] == arp1['ip']:
+                no_match = False
+                break
+            else:
+                pass
+        if no_match:
+            print "Missing ARP on {0} | ARP: {1}|{2}".format(ip1, arp2['ip'], arp2['mac'])
+            missing_on_a_list.append("IP: " + arp2['ip'] + " | MAC: " + arp2['mac'])
 
-    print "Match Count:       {0}".format(str(match_count))
-    print "Descrepancy Count: {0}".format(str(descr_count))
-    print "Missing Count:     {0}".format(str(miss_count))
-
+    print "***** Comparison Results *****"
+    print "----- ARP Discrepancies -----"
+    for item in discrep_list:
+        print item
+    print "-----------------------------"
+    print "----- ARPs NOT on A -----"
+    for item in missing_on_a_list:
+        print item
+    print "-----------------------------"
+    print "----- ARPs NOT on B -----"
+    for item in missing_on_b_list:
+        print item
+    print "-----------------------------"
+    print "Total Matching ARPs: {0}".format(str(match_count))
+    print "-----------------------------"
 
 # A function to display a list dict in a "pretty" format
 def print_listdict(list_dict):
