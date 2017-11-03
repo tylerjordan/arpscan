@@ -115,10 +115,13 @@ def get_arp_table(ip):
         for arptableentry in arpsw_response['arp-table-information']['arp-table-entry']:
             #print "MAC: {0} -> IP: {1}".format(arptableentry['mac-address'].encode('utf-8'),
             #  arptableentry['ip-address'].encode('utf-8'))
-            if 'none' in arptableentry['arp-table-entry-flag']:
+            if 'permanent' in arptableentry['arp-table-entry-flags'] \
+                    and 'remotely-learnt-address' in arptableentry['arp-table-entry-flags']:
+                arpflag = 'perm_remote'
+            elif 'none' in arptableentry['arp-table-entry-flags']:
                 arpflag = 'none'
             else:
-                arpflag = 'perm_remote'
+                arpflag = 'permanent'
             arp_mac_listdict.append({'ip': arptableentry['ip-address'].encode('utf-8'),
                                      'mac': arptableentry['mac-address'].encode('utf-8'),
                                      'flag': arpflag})
@@ -246,10 +249,10 @@ def print_listdict(list_dict):
         Purpose: Display a table showing contents of the list dictionary.
         Returns: Nothing
     """
-    t = PrettyTable(['IP', 'MAC'])
+    t = PrettyTable(['IP', 'MAC', 'FLAG'])
     for host_dict in list_dict:
         # print device
-        t.add_row([host_dict['ip'], host_dict['mac']])
+        t.add_row([host_dict['ip'], host_dict['mac'], host_dict['flag']])
     print t
     print "Total Entries: {0}".format(len(list_dict))
 
