@@ -119,25 +119,67 @@ def get_arp_table(ip):
 
 # A function to capture ARP tables and compare them
 def arpscan():
-    if ip1:
-        arp_mac_listdict1 = get_arp_table(ip1)
-        print "Device 1:"
-        print_listdict(arp_mac_listdict1)
+    # CSV Testing Code
+    arp_mac_listdict1 = csvListDict(os.path.join(dir_path, 'arps-orig.csv'))
+    print "Device 1:"
+    print_listdict(arp_mac_listdict1)
 
     arp_mac_listdict2 = csvListDict(os.path.join(dir_path, 'arps-mod.csv'))
     print "Device 2:"
     print_listdict(arp_mac_listdict2)
-    #if ip2:
-    #    arp_mac_listdict2 = get_arp_table(ip2)
-    #    print "Device 2:"
-    #    print_listdict(arp_mac_listdict2)
 
+    # Router Code
+    '''
+    if ip1:
+        arp_mac_listdict1 = get_arp_table(ip1)
+        print "Device 1:"
+        print_listdict(arp_mac_listdict1)
+    if ip2:
+        arp_mac_listdict2 = get_arp_table(ip2)
+        print "Device 2:"
+        print_listdict(arp_mac_listdict2)
+    '''
+    '''
+    # Diff code
     pairs = zip(arp_mac_listdict1, arp_mac_listdict2)
     odd_listdict = [(x, y) for x, y in pairs if x != y]
+    '''
+    compare_arp_tables(arp_mac_listdict1, arp_mac_listdict2, ip1, ip2)
+    compare_arp_tables(arp_mac_listdict2, arp_mac_listdict1, ip2, ip1)
 
-    # Print discrepancies
-    print "Discrepancies:"
-    print odd_listdict
+
+# Custom function for comparing ARP tables
+def compare_arp_tables(arptab1, arptab2, ip1, ip2):
+    # Compare ARP Tables
+    match_count = 0
+    descr_count = 0
+    miss_count = 0
+    for arp1 in arptab1:
+        no_match= True
+        for arp2 in arptab2:
+            # If these records have the same IP
+            if arp1['ip'] == arp2['ip']:
+                # If these records have the same MAC
+                if arp1['mac'] == arp2['mac']:
+                   # Exact Match
+                   match_count += 1
+                # If these records have different MACs
+                else:
+                    print "MAC Discrepancy - IP: {0} | {1} MAC: {2} | {3} MAC: {4}".format(arp1['ip'], ip1, arp1['mac'], ip2, arp2['mac'])
+                    descr_count += 1
+                no_match = False
+                break
+            # If these records have different IPs
+            else:
+                # Move onto next IP...
+                pass
+        if no_match:
+            print "Missing ARP on {0} | ARP: {1}|{2}".format(ip2, arp1['ip'], arp1['mac'])
+            miss_count += 1
+
+    print "Match Count:       {0}".format(str(match_count))
+    print "Descrepancy Count: {0}".format(str(descr_count))
+    print "Missing Count:     {0}".format(str(miss_count))
 
 
 # A function to display a list dict in a "pretty" format
