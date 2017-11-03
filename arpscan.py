@@ -167,7 +167,7 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
                    match_count += 1
                 # If these records have different MACs
                 else:
-                    print "MAC Discrepancy - IP: {0} | {1} MAC: {2} | {3} MAC: {4}".format(arp1['ip'], ip1, arp1['mac'], ip2, arp2['mac'])
+                    #print "MAC Discrepancy - IP: {0} | {1} MAC: {2} | {3} MAC: {4}".format(arp1['ip'], ip1, arp1['mac'], ip2, arp2['mac'])
                     discrep_list.append("IP: " + arp1['ip'] + " | MAC on A: " + arp1['mac'] + " | MAC on B: " + arp2['mac'])
                 no_match = False
                 break
@@ -176,7 +176,7 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
                 # Move onto next IP...
                 pass
         if no_match:
-            print "Missing ARP on {0} | ARP: {1}|{2}".format(ip2, arp1['ip'], arp1['mac'])
+            #print "Missing ARP on {0} | ARP: {1}|{2}".format(ip2, arp1['ip'], arp1['mac'])
             missing_on_b_list.append("IP: " + arp1['ip'] + " | MAC: " + arp1['mac'])
     # Compares B against A
     for arp2 in arptab2:
@@ -188,21 +188,22 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
             else:
                 pass
         if no_match:
-            print "Missing ARP on {0} | ARP: {1}|{2}".format(ip1, arp2['ip'], arp2['mac'])
+            #print "Missing ARP on {0} | ARP: {1}|{2}".format(ip1, arp2['ip'], arp2['mac'])
             missing_on_a_list.append("IP: " + arp2['ip'] + " | MAC: " + arp2['mac'])
 
     print "***** Comparison Results *****"
     print "----- ARP Discrepancies -----"
     for item in discrep_list:
         print item
-    print "-----------------------------"
+    print "-----------------------------\n"
     print "----- ARPs on B, NOT on A -----"
     for item in missing_on_a_list:
         print item
-    print "-----------------------------"
+    print "-----------------------------\n"
     print "----- ARPs on A, NOT on B -----"
     for item in missing_on_b_list:
         print item
+    print "-----------------------------\n"
     print "-----------------------------"
     print "Total Matching ARPs: {0}".format(str(match_count))
     print "-----------------------------"
