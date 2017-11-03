@@ -120,33 +120,46 @@ def get_arp_table(ip):
 
 # A function to capture ARP tables and compare them
 def arpscan():
-    # CSV Testing Code
-    arp_mac_listdict1 = csvListDict(os.path.join(dir_path, 'arps-orig.csv'))
-    print "Device 1:"
-    print_listdict(arp_mac_listdict1)
+    print "-"*22
+    print "- Loading ARP Tables -"
+    print "-"*22
 
-    arp_mac_listdict2 = csvListDict(os.path.join(dir_path, 'arps-mod.csv'))
-    print "Device 2:"
-    print_listdict(arp_mac_listdict2)
+    # CSV Testing Code
+    router_a = 'arps-orig.csv'
+    router_b = 'arps-mod.csv'
+    # Loads the following CSV into a list dictionary
+    arp_mac_listdict1 = csvListDict(os.path.join(dir_path, router_a))
+    if arp_mac_listdict1:
+        print "Successfully loaded Test ARP table from {0}".format(router_a)
+        #print_listdict(arp_mac_listdict1)
+        arp_mac_listdict2 = csvListDict(os.path.join(dir_path, 'arps-mod.csv'))
+        if arp_mac_listdict2:
+            print "Successfully loaded Test ARP table from {0}".format(router_b)
+            #print_listdict(arp_mac_listdict2)
+            compare_arp_tables(arp_mac_listdict1, arp_mac_listdict2, ip1, ip2)
+        else:
+            print "Issue populating ARP table from {0}".format(router_b)
+    else:
+        print "Issue populating ARP table for {0}".format(router_a)
 
     # Router Code
     '''
     if ip1:
+        print "Retrieving ARP table from {0}".format(ip1)
         arp_mac_listdict1 = get_arp_table(ip1)
-        print "Device 1:"
-        print_listdict(arp_mac_listdict1)
-    if ip2:
-        arp_mac_listdict2 = get_arp_table(ip2)
-        print "Device 2:"
-        print_listdict(arp_mac_listdict2)
+        print "Successfully captured ARP table from {0}".format(ip1)
+        #print_listdict(arp_mac_listdict1)
+        if ip2:
+            print "Retrieving ARP table from {0}".format(ip2)
+            arp_mac_listdict2 = get_arp_table(ip2)
+            print "Successfully captured ARP table from {0}".format(ip2)
+            #print_listdict(arp_mac_listdict2)
+            compare_arp_tables(arp_mac_listdict1, arp_mac_listdict2, ip1, ip2)
+        else:
+            print "Issue populating ARP table for {0}".format(ip1)
+    else:
+        print "Issue populating ARP table for {0}".format(ip2)
     '''
-    '''
-    # Diff code
-    pairs = zip(arp_mac_listdict1, arp_mac_listdict2)
-    odd_listdict = [(x, y) for x, y in pairs if x != y]
-    '''
-    compare_arp_tables(arp_mac_listdict1, arp_mac_listdict2, ip1, ip2)
-
 
 # Custom function for comparing ARP tables
 def compare_arp_tables(arptab1, arptab2, ip1, ip2):
@@ -191,22 +204,24 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
             #print "Missing ARP on {0} | ARP: {1}|{2}".format(ip1, arp2['ip'], arp2['mac'])
             missing_on_a_list.append("IP: " + arp2['ip'] + " | MAC: " + arp2['mac'])
 
-    print "***** Comparison Results *****"
-    print "----- ARP Discrepancies -----"
+    print "\n" + "-"*22
+    print "- Comparison Results -"
+    print "-"*22
+    print "  - ARP Discrepancies -"
     for item in discrep_list:
-        print item
-    print "-----------------------------\n"
-    print "----- ARPs on B, NOT on A -----"
+        print "\t" + item
+    print "-"*100
+    print "  - ARPs on B, NOT on A -"
     for item in missing_on_a_list:
-        print item
-    print "-----------------------------\n"
-    print "----- ARPs on A, NOT on B -----"
+        print "\t" + item
+    print "-"*100
+    print "  - ARPs on A, NOT on B -"
     for item in missing_on_b_list:
-        print item
-    print "-----------------------------\n"
+        print "\t" + item
+    print "-"*100
     print "-----------------------------"
     print "Total Matching ARPs: {0}".format(str(match_count))
-    print "-----------------------------"
+    print "-----------------------------\n"
 
 # A function to display a list dict in a "pretty" format
 def print_listdict(list_dict):
