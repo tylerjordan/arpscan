@@ -189,8 +189,8 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
                 # If these records have the same MAC
                 if arp1['mac'] == arp2['mac']:
                     # If these records have the same flag
-                    if arp1['flag'] == arp2['flag']:
-                        both_perm_list.append("IP: " + arp1['ip'] + "MAC:" + arp1['mac'] + "FLAG: " + arp1['flag'])
+                    if arp1['flag'] == 'perm_remote' and arp2['flag'] == 'perm_remote':
+                        both_perm_list.append("IP: " + arp1['ip'] + " | MAC: " + arp1['mac'] + " | FLAG: " + arp1['flag'])
                     else:
                         # Good Match
                         good_count += 1
