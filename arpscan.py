@@ -23,6 +23,7 @@ from netaddr import IPAddress, IPNetwork
 
 # Paths
 dir_path = ''
+conf_path = ''
 
 # Params
 mypwd = ''
@@ -35,7 +36,15 @@ def detect_env():
     :return: None
     """
     global dir_path
+    global conf_path
+
     dir_path = os.path.dirname(os.path.abspath(__file__))
+    if platform.system().lower() == "windows":
+        #print "Environment Windows!"
+        conf_path = os.path.join(dir_path, "conf")
+    else:
+        #print "Environment Linux/MAC!"
+        conf_path = os.path.join(dir_path, "conf")
 
 # Handles arguments provided at the command line
 def getargs(argv):
@@ -134,8 +143,8 @@ def arpscan():
     print "- Loading ARP Tables -"
     print "-"*22
 
-
-    # CSV Testing Code
+    # TESTING Code
+    #'''
     router_a = 'ita_arp.csv'
     router_b = 'itb_arp.csv'
     # Loads the following CSV into a list dictionary
@@ -152,20 +161,20 @@ def arpscan():
             print "Issue populating ARP table from {0}".format(router_b)
     else:
         print "Issue populating ARP table for {0}".format(router_a)
-
-    # Router Code
+    #'''
+    # OPERATIONAL Code
     '''
     if ip1:
         print "Retrieving ARP table from {0}".format(ip1)
         arp_mac_listdict1 = get_arp_table(ip1)
         print "Successfully captured ARP table from {0}".format(ip1)
-        print_listdict(arp_mac_listdict1)
+        #print_listdict(arp_mac_listdict1)
         if ip2:
             print "Retrieving ARP table from {0}".format(ip2)
             arp_mac_listdict2 = get_arp_table(ip2)
             print "Successfully captured ARP table from {0}".format(ip2)
-            print_listdict(arp_mac_listdict2)
-            #compare_arp_tables(arp_mac_listdict1, arp_mac_listdict2, ip1, ip2)
+            #print_listdict(arp_mac_listdict2)
+            compare_arp_tables(arp_mac_listdict1, arp_mac_listdict2, ip1, ip2)
         else:
             print "Issue populating ARP table for {0}".format(ip1)
     else:
@@ -176,10 +185,14 @@ def arpscan():
 def compare_arp_tables(arptab1, arptab2, ip1, ip2):
     # Compare ARP Tables
     good_count = 0
-    both_perm_list = []
-    discrep_list = []
-    missing_on_a_list = []
-    missing_on_b_list = []
+    clear_ether_list = []
+    clear_arp_a_list = []
+    clear_arp_b_list = []
+
+    perm_remote_dictlist = []       # Format: 'ip', 'mac'
+    discrep_dictlist = []           # Format: 'ip', 'mac_a', 'mac_b'
+    miss_on_b_dictlist = []         # Format: 'ip', 'mac', 'flag'
+    miss_on_a_dictlist = []         # Format: 'ip', 'mac', 'flag'
     # Compares A against B
     for arp1 in arptab1:
         no_match= True
@@ -190,23 +203,34 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
                 if arp1['mac'] == arp2['mac']:
                     # If these records have the same flag
                     if arp1['flag'] == 'perm_remote' and arp2['flag'] == 'perm_remote':
-                        both_perm_list.append("IP: " + arp1['ip'] + " | MAC: " + arp1['mac'] + " | FLAG: " + arp1['flag'])
+                        # If this is NOT a duplicate
+                        if not any(d['mac'] == arp1['mac'] for d in perm_remote_dictlist):
+                            clear_ether_list.append("clear ethernet-switching table mac " + arp1['mac'] + "\n")
+                        # If it is a duplicate
+                        else:
+                           #print "Duplicate MAC: {0} on IP: {1}!".format(arp1['mac'], arp1['ip'])
+                            pass
+                        # Add record regardless
+                        perm_remote_dictlist.append({'ip': arp1['ip'], 'mac': arp1['mac']})
                     else:
                         # Good Match
                         good_count += 1
                 # If these records have different MACs
                 else:
-                    discrep_list.append("IP: " + arp1['ip'] + " | MAC on A: " + arp1['mac'] + " | MAC on B: " \
-                                        + arp2['mac'])
+                    discrep_dictlist.append({'ip': arp1['ip'], 'mac_a': arp1['mac'], 'mac_b': arp2['mac']})
                 no_match = False
                 break
             # If these records have different IPs
             else:
                 # Move onto next IP...
                 pass
+        # If no match was made, this ARP doesn't exist on B
         if no_match:
-            #print "Missing ARP on {0} | ARP: {1}|{2}".format(ip2, arp1['ip'], arp1['mac'])
-            missing_on_b_list.append("IP: " + arp1['ip'] + " | MAC: " + arp1['mac'] + " | FLAG: " + arp1['flag'])
+            if not arp1['flag']:
+                print "IP: {0} -> Bang!".format(arp1['ip'])
+            else:
+                miss_on_b_dictlist.append(arp1)
+                clear_arp_a_list.append("clear arp hostname " + arp1['ip'] + "\n")
     # Compares B against A
     for arp2 in arptab2:
         no_match = True
@@ -216,39 +240,87 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
                 break
             else:
                 pass
+        # If not match was made, this ARP deosn't exist on A
         if no_match:
-            #print "Missing ARP on {0} | ARP: {1}|{2}".format(ip1, arp2['ip'], arp2['mac'])
             if not arp2['flag']:
                 print "IP: {0} -> Bang!".format(arp2['ip'])
             else:
-                missing_on_a_list.append("IP: " + arp2['ip'] + " | MAC: " + arp2['mac'] + " | FLAG: " + arp2['flag'])
+                miss_on_a_dictlist.append(arp2)
+                clear_arp_b_list.append("clear arp hostname " + arp2['ip'] + "\n")
 
+    # Create configuration file with clear commands if applicable
+    if clear_ether_list or clear_arp_a_list or clear_arp_b_list:
+        # Create config file
+        now = get_now_time()
+        clear_conf_name = "clear_comds_" + now + "_.conf"
+        myconfile = os.path.join(conf_path, clear_conf_name)
+        print_log("##\n## TOTALS:\n## Both Permanent|Remote: " + str(len(perm_remote_dictlist)) + "\n", myconfile)
+        print_log("## 'none' Status on A: " + str(len(miss_on_a_dictlist)) + "\n", myconfile)
+        print_log("## 'none' Status on B: " + str(len(miss_on_b_dictlist)) + "\n", myconfile)
+        print_log("##\n", myconfile)
+
+        if clear_ether_list:
+            # Loop ether_list and add commands
+            print_log("##\n## Both Permanent|Remote - Run these commands on both devices.\n##\n", myconfile)
+            for command in clear_ether_list:
+                print_log(command, myconfile)
+
+        if clear_arp_a_list:
+            # Loop arp_list and add commands
+            print_log("##\n## None Status on A - Run these commands on " + ip1 + "\n##\n", myconfile)
+            for command in clear_arp_a_list:
+                print_log(command, myconfile)
+
+        if clear_arp_a_list:
+            # Loop arp_list and add commands
+            print_log("##\n## None Status on B - Run these commands on " + ip2 + "\n##\n", myconfile)
+            for command in clear_arp_b_list:
+                print_log(command, myconfile)
+
+    # Printing the results of the comparison
     print "\n" + "-"*22
     print "- Comparison Results -"
     print "-"*22
     print "  - Both Perm ARPs -"
-    for item in both_perm_list:
-        print "\t" + item
+    print "-"*100
+    if perm_remote_dictlist:
+        for item in perm_remote_dictlist:
+            print "\t" + "IP: " + item['ip'] + " | MAC: " + item['mac']
+    else:
+        print "\tNo Matches Found"
     print "-"*100
     print "  - ARP Discrepancies -"
-    for item in discrep_list:
-        print "\t" + item
+    print "-"*100
+    if discrep_dictlist:
+        for item in discrep_dictlist:
+            print "\t" + "IP: " + item['ip'] + " | MAC on A: " + item['mac_a'] + " | MAC on B: " + item['mac_b']
+    else:
+        print "\tNo Matches Found"
     print "-"*100
     print "  - ARPs on B, NOT on A -"
-    for item in missing_on_a_list:
-        print "\t" + item
+    print "-"*100
+    if miss_on_a_dictlist:
+        for item in miss_on_a_dictlist:
+            print "\t" + "IP: " + item['ip'] + " | MAC: " + item['mac'] + " | FLAG: " + item['flag']
+    else:
+        print "\tNo Matches Found"
     print "-"*100
     print "  - ARPs on A, NOT on B -"
-    for item in missing_on_b_list:
-        print "\t" + item
+    print "-"*100
+    if miss_on_b_dictlist:
+        for item in miss_on_b_dictlist:
+            print "\t" + "IP: " + item['ip'] + " | MAC: " + item['mac'] + " | FLAG: " + item['flag']
+    else:
+        print "\tNo Matches Found"
     print "-"*100
     print "-----------------------------"
-    print "Total Both Permanent: {0}".format(len(both_perm_list))
-    print "Total ARP Discrepancies: {0}".format(len(discrep_list))
-    print "Total ARP on B, Not A: {0}".format(len(missing_on_a_list))
-    print "Total ARP on A, Not B: {0}".format(len(missing_on_b_list))
+    print "Total Both Permanent: {0}".format(len(perm_remote_dictlist))
+    print "Total ARP Discrepancies: {0}".format(len(discrep_dictlist))
+    print "Total ARP on B, Not A: {0}".format(len(miss_on_a_dictlist))
+    print "Total ARP on A, Not B: {0}".format(len(miss_on_b_dictlist))
     print "Total Matching ARPs: {0}".format(str(good_count))
     print "-----------------------------\n"
+
 
 # A function to display a list dict in a "pretty" format
 def print_listdict(list_dict):
