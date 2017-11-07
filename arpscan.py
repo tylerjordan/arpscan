@@ -191,8 +191,8 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
 
     perm_remote_dictlist = []       # Format: 'ip', 'mac'
     discrep_dictlist = []           # Format: 'ip', 'mac_a', 'mac_b'
-    miss_on_b_dictlist = []         # Format: 'ip', 'mac', 'flag'
     miss_on_a_dictlist = []         # Format: 'ip', 'mac', 'flag'
+    miss_on_b_dictlist = []         # Format: 'ip', 'mac', 'flag'
     # Compares A against B
     for arp1 in arptab1:
         no_match= True
@@ -226,11 +226,18 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
                 pass
         # If no match was made, this ARP doesn't exist on B
         if no_match:
-            if not arp1['flag']:
-                print "IP: {0} -> Bang!".format(arp1['ip'])
+            # Checks that flag has a value
+            if arp1['flag']:
+                # If flag's value is 'none'
+                if arp1['flag'] == 'none':
+                    miss_on_b_dictlist.append(arp1)
+                    clear_arp_a_list.append("clear arp hostname " + arp1['ip'] + "\n")
+                else:
+                    miss_on_b_dictlist.append(arp1)
+                    pass
+            # If flag value is missing
             else:
-                miss_on_b_dictlist.append(arp1)
-                clear_arp_a_list.append("clear arp hostname " + arp1['ip'] + "\n")
+                print "ERROR: On {0} -> Missing Flag for IP: {1}".format(ip1, arp1['ip'])
     # Compares B against A
     for arp2 in arptab2:
         no_match = True
@@ -242,11 +249,17 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
                 pass
         # If not match was made, this ARP deosn't exist on A
         if no_match:
-            if not arp2['flag']:
-                print "IP: {0} -> Bang!".format(arp2['ip'])
+            if arp2['flag']:
+                # If flag's value is 'none'
+                if arp2['flag'] == 'none':
+                    miss_on_a_dictlist.append(arp2)
+                    clear_arp_b_list.append("clear arp hostname " + arp2['ip'] + "\n")
+                else:
+                    miss_on_a_dictlist.append(arp2)
+                    pass
+            # If flag value is missing
             else:
-                miss_on_a_dictlist.append(arp2)
-                clear_arp_b_list.append("clear arp hostname " + arp2['ip'] + "\n")
+                print "ERROR: On {0} -> Missing Flag for IP: {1}".format(ip2, arp2['ip'])
 
     # Create configuration file with clear commands if applicable
     if clear_ether_list or clear_arp_a_list or clear_arp_b_list:
@@ -255,8 +268,8 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
         clear_conf_name = "clear_comds_" + now + "_.conf"
         myconfile = os.path.join(conf_path, clear_conf_name)
         print_log("##\n## TOTALS:\n## Both Permanent|Remote: " + str(len(perm_remote_dictlist)) + "\n", myconfile)
-        print_log("## 'none' Status on A: " + str(len(miss_on_a_dictlist)) + "\n", myconfile)
-        print_log("## 'none' Status on B: " + str(len(miss_on_b_dictlist)) + "\n", myconfile)
+        print_log("## 'none' Status on A: " + str(len(clear_arp_a_list)) + "\n", myconfile)
+        print_log("## 'none' Status on B: " + str(len(clear_arp_b_list)) + "\n", myconfile)
         print_log("##\n", myconfile)
 
         if clear_ether_list:
@@ -300,7 +313,8 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
     print "  - ARPs on B, NOT on A -"
     print "-"*100
     if miss_on_a_dictlist:
-        for item in miss_on_a_dictlist:
+        sorted_list = list_dict_custom_sort(miss_on_a_dictlist, 'flag', ['none'])
+        for item in sorted_list:
             print "\t" + "IP: " + item['ip'] + " | MAC: " + item['mac'] + " | FLAG: " + item['flag']
     else:
         print "\tNo Matches Found"
@@ -308,7 +322,8 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
     print "  - ARPs on A, NOT on B -"
     print "-"*100
     if miss_on_b_dictlist:
-        for item in miss_on_b_dictlist:
+        sorted_list = list_dict_custom_sort(miss_on_b_dictlist, 'flag', ['none'])
+        for item in sorted_list:
             print "\t" + "IP: " + item['ip'] + " | MAC: " + item['mac'] + " | FLAG: " + item['flag']
     else:
         print "\tNo Matches Found"

@@ -446,7 +446,12 @@ def csv_write_sort(list_dict, csv_file, sort_column, reverse_sort=False, column_
         return False
 
 # Sorts a list of dictionaries based on supplied key/value pair
-def list_dict_custom_sort(list_dict, sort_attrib, sort_list, exclusion_attrib, exclustion_list):
+def list_dict_custom_sort(list_dict, sort_attrib, sort_list, exclusion_attrib=[], exclustion_list=[]):
+    # Use:
+    # sort_attrib........The list of keys to sort the list of dictionaries on
+    # sort_list..........The list of values to sort on, relates to the keys above
+    # exclusion_attrib...The list of keys to
+    #
     #print "Intf List:"
     #print list_dict
     # Sort the dictionary list
@@ -454,16 +459,21 @@ def list_dict_custom_sort(list_dict, sort_attrib, sort_list, exclusion_attrib, e
 
     # Loop over list to get primary interfaces
     for sort_val in sort_list:
+        #print "Sort Val:{0}".format(sort_val)
         for intf_rec in list_dict:
             #print "Compare [{0}] to [{1}]".format(item, intf_rec[sort_attrib])
             #print "Sort Val: {0} | Attrib Val: {1}".format(sort_val, intf_rec[sort_attrib])
             if intf_rec[sort_attrib] == sort_val:
-                if intf_rec[exclusion_attrib] not in exclustion_list:
-                    #print "Selected {0}".format(sort_val)
+                if exclusion_attrib:
+                    if intf_rec[exclusion_attrib] not in exclustion_list:
+                        #print "Selected {0}".format(sort_val)
+                        mylist = sorted(list_dict, key=lambda x: x[sort_attrib] != sort_val)
+                        return mylist
+                else:
                     mylist = sorted(list_dict, key=lambda x: x[sort_attrib] != sort_val)
                     return mylist
-                #else:
-                #    print "Excluded {0} due to {1}".format(sort_val, intf_rec[exclusion_attrib])
+                    #else:
+                    #    print "Excluded {0} due to {1}".format(sort_val, intf_rec[exclusion_attrib])
     return mylist
 
 # Accetps a masked or unmasked IP and returns the IP and mask in a list
