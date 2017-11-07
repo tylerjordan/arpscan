@@ -185,10 +185,12 @@ def arpscan():
 def compare_arp_tables(arptab1, arptab2, ip1, ip2):
     # Compare ARP Tables
     good_count = 0
+    # Lists to hold the Juniper commands for removing ARPs
     clear_ether_list = []
     clear_arp_a_list = []
     clear_arp_b_list = []
 
+    # Dictlists for holding content for outputs
     perm_remote_dictlist = []       # Format: 'ip', 'mac'
     discrep_dictlist = []           # Format: 'ip', 'mac_a', 'mac_b'
     miss_on_a_dictlist = []         # Format: 'ip', 'mac', 'flag'
@@ -335,7 +337,6 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
     print "Total ARP on A, Not B: {0}".format(len(miss_on_b_dictlist))
     print "Total Matching ARPs: {0}".format(str(good_count))
     print "-----------------------------\n"
-
 
 # A function to display a list dict in a "pretty" format
 def print_listdict(list_dict):
