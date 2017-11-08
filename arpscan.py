@@ -144,7 +144,7 @@ def arpscan():
     print "-"*22
 
     # TESTING Code
-    #'''
+    '''
     router_a = 'ita_arp.csv'
     router_b = 'itb_arp.csv'
     # Loads the following CSV into a list dictionary
@@ -161,9 +161,9 @@ def arpscan():
             print "Issue populating ARP table from {0}".format(router_b)
     else:
         print "Issue populating ARP table for {0}".format(router_a)
-    #'''
-    # OPERATIONAL Code
     '''
+    # OPERATIONAL Code
+    #'''
     if ip1:
         print "Retrieving ARP table from {0}".format(ip1)
         arp_mac_listdict1 = get_arp_table(ip1)
@@ -179,7 +179,7 @@ def arpscan():
             print "Issue populating ARP table for {0}".format(ip1)
     else:
         print "Issue populating ARP table for {0}".format(ip2)
-    '''
+    #'''
 
 # Custom function for comparing ARP tables
 def compare_arp_tables(arptab1, arptab2, ip1, ip2):
