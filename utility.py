@@ -765,3 +765,28 @@ def xml_to_set(xml_output):
 
         print "### SET LIST ###"
         print set_list
+
+# Create a list of lines from a text file
+def line_list(filepath):
+    """ Purpose: Create a list of lines from the file defined.
+
+        :param filepath:    -   The path/filename of the file
+        :return linelist:   -   A list of Strings from the file.
+    """
+    linelist = []
+    try:
+        f = open(filepath, 'r')
+    except IOError as ioex:
+        if ioex.errno == 2:
+            print "No IPList Defined"
+        else:
+            print 'IOERROR: Unable to open file: {0} | File: {1}'.format(err, filepath)
+        return False
+    except Exception as err:
+        print 'ERROR: Unable to open file: {0} | File: {1}'.format(err, filepath)
+    else:
+        for line in f.readlines():
+            if line:
+                linelist.append(line.replace('\n', '').replace('\r', ''))
+        f.close()
+        return linelist
