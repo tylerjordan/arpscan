@@ -294,9 +294,10 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
         now = get_now_time()
         clear_conf_name = "clear_comds_" + now + "_.conf"
         myconfile = os.path.join(conf_path, clear_conf_name)
-        print_log("##\n## TOTALS:\n## Both Permanent|Remote: " + str(len(perm_remote_dictlist)) + "\n", myconfile)
-        print_log("## Exists on A, not B: " + str(len(clear_arp_a_list)) + "\n", myconfile)
-        print_log("## Exists on B, not A: " + str(len(clear_arp_b_list)) + "\n", myconfile)
+        print_log("##\n## TOTALS:\n", myconfile)
+        print_log("## Both Permanent|Remote ...." + str(len(perm_remote_dictlist)) + "\n", myconfile)
+        print_log("## Exists on A, not B ......." + str(len(clear_arp_a_list)) + "\n", myconfile)
+        print_log("## Exists on B, not A ......." + str(len(clear_arp_b_list)) + "\n", myconfile)
         print_log("##\n", myconfile)
 
         if clear_ether_list:
@@ -356,11 +357,11 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
         print "\tNo Matches Found"
     print "-"*100
     print "-----------------------------"
-    print "Total Both Permanent: {0}".format(len(perm_remote_dictlist))
-    print "Total ARP Discrepancies: {0}".format(len(discrep_dictlist))
-    print "Total ARP on B, Not A: {0}".format(len(miss_on_a_dictlist))
-    print "Total ARP on A, Not B: {0}".format(len(miss_on_b_dictlist))
-    print "Total Matching ARPs: {0}".format(str(good_count))
+    print "Total Both Permanent .......{0}".format(len(perm_remote_dictlist))
+    print "Total Unmatch ARPs .........{0}".format(len(discrep_dictlist))
+    print "Total ARPs on B, Not A .....{0}".format(len(miss_on_a_dictlist))
+    print "Total ARPs on A, Not B .....{0}".format(len(miss_on_b_dictlist))
+    print "Total Valid ARPs ...........{0}".format(str(good_count))
     print "-----------------------------\n"
 
 # A function to display a list dict in a "pretty" format
