@@ -566,7 +566,7 @@ def print_sl(statement, file_list):
         print_log(statement, file_list)
 
 # Append output to log file only
-def print_log(statement, logfile):
+def print_log(statement, logfile, add_carriage_return=False):
     # Print to log
     #print "Log File: {0}".format(logfile)
     try:
@@ -574,7 +574,10 @@ def print_log(statement, logfile):
     except Exception as err:
         print "Error opening log file {0}".format(err)
     else:
-        logobj.write(statement)
+        if add_carriage_return:
+            logobj.write(statement + "\n")
+        else:
+            logobj.write(statement)
         logobj.close()
 
 # Write text to a file. Overwrite existing contents.

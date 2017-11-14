@@ -26,6 +26,7 @@ from netaddr import IPAddress, IPNetwork
 # Paths
 dir_path = ''
 conf_path = ''
+log_path = ''
 
 # Params
 mypwd = ''
@@ -39,14 +40,17 @@ def detect_env():
     """
     global dir_path
     global conf_path
+    global log_path
 
     dir_path = os.path.dirname(os.path.abspath(__file__))
     if platform.system().lower() == "windows":
         #print "Environment Windows!"
         conf_path = os.path.join(dir_path, "conf")
+        log_path = os.path.join(dir_path, "log")
     else:
         #print "Environment Linux/MAC!"
         conf_path = os.path.join(dir_path, "conf")
+        log_path = os.path.join(dir_path, "log")
 
 # Handles arguments provided at the command line
 def getargs(argv):
@@ -114,33 +118,30 @@ def connect(ip):
         return dev
 
 # Capture the ARP table from the device
-def get_arp_table(dev):
-    arpsw_response = jxmlease.parse_etree(dev.rpc.get_arp_table_information(no_resolve=True))
-    for arptableentry in arpsw_response['arp-table-information']['arp-table-entry']:
-        # print "MAC: {0} -> IP: {1}".format(arptableentry['mac-address'].encode('utf-8'),
-        #  arptableentry['ip-address'].encode('utf-8'))
-        if 'permanent' in arptableentry['arp-table-entry-flags'] \
-                and 'remotely-learnt-address' in arptableentry['arp-table-entry-flags']:
-            arpflag = 'perm_remote'
-        elif 'none' in arptableentry['arp-table-entry-flags']:
-            arpflag = 'none'
-        else:
-            arpflag = 'permanent'
-        arp_mac_listdict.append({'ip': arptableentry['ip-address'].encode('utf-8'),
-                                 'mac': arptableentry['mac-address'].encode('utf-8'),
-                                 'flag': arpflag})
-
-# Function for collecting the ARP information from the Juniper devices
-def collect_data(ip):
-    # ARP list dictionary
+def get_arp_table(ip):
+    # Place to store ARP info
     arp_mac_listdict = []
     # Open a connection to this IP
     dev = connect(ip)
     if dev:
         print "Connected to {0}".format(ip)
-        arp_mac_listdict = get_arp_table(dev)
+        # Request ARP table information from device
+        arpsw_response = jxmlease.parse_etree(dev.rpc.get_arp_table_information(no_resolve=True))
+        for arptableentry in arpsw_response['arp-table-information']['arp-table-entry']:
+            # print "MAC: {0} -> IP: {1}".format(arptableentry['mac-address'].encode('utf-8'),
+            #  arptableentry['ip-address'].encode('utf-8'))
+            if 'permanent' in arptableentry['arp-table-entry-flags'] \
+                    and 'remotely-learnt-address' in arptableentry['arp-table-entry-flags']:
+                arpflag = 'perm_remote'
+            elif 'none' in arptableentry['arp-table-entry-flags']:
+                arpflag = 'none'
+            else:
+                arpflag = 'permanent'
+            arp_mac_listdict.append({'ip': arptableentry['ip-address'].encode('utf-8'),
+                                     'mac': arptableentry['mac-address'].encode('utf-8'),
+                                     'flag': arpflag})
         dev.close()
-    # Return the listdict
+    # Return the ARP table to requestor
     return arp_mac_listdict
 
 # Remove uninteresting ARP entries
@@ -260,6 +261,7 @@ def arpscan():
 
     # Print Results
     print_results(both_perm, both_none, misc_flag, mac_discr, miss_on_a, miss_on_b, valid_count_1)
+    print "Completed creating results log file."
 
 def compare_listdict(listdict1, listdict2):
     common_ld = []
@@ -298,14 +300,14 @@ def oper_compare_capture():
     # Retrieve information from device A
     if ip1:
         print "Retrieving ARP table from {0}".format(ip1)
-        arp_mac_listdict1 = collect_data(ip1)
+        arp_mac_listdict1 = get_arp_table(ip1)
         print "Successfully captured ARP table from {0}".format(ip1)
         arp_mac_listdict1 = filter_excluded_arps(arp_mac_listdict1)
         print "Completed filtering ARPs for {0}.".format(ip1)
         # Retrieve information from device B
         if ip2:
             print "Retrieving ARP table from {0}".format(ip2)
-            arp_mac_listdict2 = collect_data(ip2)
+            arp_mac_listdict2 = get_arp_table(ip2)
             print "Successfully captured ARP table from {0}".format(ip2)
             arp_mac_listdict2 = filter_excluded_arps(arp_mac_listdict2)
             print "Completed filtering ARPs for {0}.".format(ip2)
@@ -431,70 +433,75 @@ def create_conf_file(clear_ether_list, clear_arp_a_list, clear_arp_b_list, both_
                 print_log(command, myconfile)
 
 def print_results(both_perm_remote_dl, both_none_dl, misc_flag_dl, mac_discrep_dl, miss_on_a_dl, miss_on_b_dl, valid_count):
+    # Create log file
+    now = get_now_time()
+    log_name = "log_output_" + now + "_.log"
+    mylogfile = os.path.join(log_path, log_name)
+
     # Printing the results of the comparison
-    print "\n" + "-"*22
-    print "- Comparison Results -"
-    print "-"*22
-    print "  - Both ARPs Permanent Remote -"
-    print "-"*100
+    print_log("\n" + "-"*22, mylogfile, True)
+    print_log("- Comparison Results -", mylogfile, True)
+    print_log("-"*22, mylogfile, True)
+    print_log("  - Both ARPs Permanent Remote -", mylogfile, True)
+    print_log("-"*100, mylogfile, True)
     if both_perm_remote_dl:
         for item in both_perm_remote_dl:
-            print "\t" + "IP: " + item['ip'] + " | MAC: " + item['mac']
+            print_log("\t" + "IP: " + item['ip'] + " | MAC: " + item['mac'], mylogfile, True)
     else:
-        print "\tNo Matches Found"
-    print "-"*100
-    print "  - Both ARPs None -"
-    print "-"*100
+        print_log("\tNo Matches Found", mylogfile, True)
+    print_log("-"*100, mylogfile, True)
+    print_log("  - Both ARPs None -", mylogfile, True)
+    print_log("-"*100, mylogfile, True)
     if both_none_dl:
         for item in both_none_dl:
-            print "\t" + "IP: " + item['ip'] + " | MAC: " + item['mac']
+            print_log("\t" + "IP: " + item['ip'] + " | MAC: " + item['mac'], mylogfile, True)
     else:
-        print "\tNo Matches Found"
-    print "-"*100
-    print "  - Unexpected ARPs -"
-    print "-"*100
+        print_log("\tNo Matches Found", mylogfile, True)
+    print_log("-"*100, mylogfile, True)
+    print_log("  - Unexpected ARPs -", mylogfile, True)
+    print_log("-"*100, mylogfile, True)
     if misc_flag_dl:
         for item in misc_flag_dl:
-            print "\t" + "A - [IP: " + item['ip_a'] + " | MAC: " + item['mac_a'] + " | FLAG: " + item['flag_a'] + \
-                  "] B - [IP: " + item['ip_b'] + " | MAC: " + item['mac_b'] + " | FLAG: " + item['flag_b'] + "]"
+            print_log("\t" + "A - [IP: " + item['ip_a'] + " | MAC: " + item['mac_a'] + " | FLAG: " + item['flag_a'] + \
+                  "] B - [IP: " + item['ip_b'] + " | MAC: " + item['mac_b'] + " | FLAG: " + item['flag_b'] + "]", mylogfile, True)
     else:
-        print "\tNo Matches Found"
-    print "-"*100
-    print "  - ARP Discrepancies -"
-    print "-"*100
+        print_log("\tNo Matches Found", mylogfile, True)
+    print_log("-"*100, mylogfile, True)
+    print_log("  - ARP Discrepancies -", mylogfile, True)
+    print_log("-"*100, mylogfile, True)
     if mac_discrep_dl:
         for item in mac_discrep_dl:
-            print "\t" + "IP: " + item['ip'] + " | MAC on A: " + item['mac_a'] + " | MAC on B: " + item['mac_b']
+            print_log("\t" + "IP: " + item['ip'] + " | MAC on A: " + item['mac_a'] + " | MAC on B: " + item['mac_b'], mylogfile, True)
     else:
-        print "\tNo Matches Found"
-    print "-"*100
-    print "  - ARPs on A, NOT on B -"
-    print "-"*100
+        print_log("\tNo Matches Found", mylogfile, True)
+    print_log("-"*100, mylogfile, True)
+    print_log("  - ARPs on A, NOT on B -", mylogfile, True)
+    print_log("-"*100, mylogfile, True)
     if miss_on_b_dl:
         sorted_list = list_dict_custom_sort(miss_on_b_dl, 'flag', ['none'])
         for item in sorted_list:
-            print "\t" + "IP: " + item['ip'] + " | MAC: " + item['mac'] + " | FLAG: " + item['flag']
+            print_log("\t" + "IP: " + item['ip'] + " | MAC: " + item['mac'] + " | FLAG: " + item['flag'], mylogfile, True)
     else:
-        print "\tNo Matches Found"
-    print "-"*100
-    print "  - ARPs on B, NOT on A -"
-    print "-"*100
+        print_log("\tNo Matches Found", mylogfile, True)
+    print_log("-"*100, mylogfile, True)
+    print_log("  - ARPs on B, NOT on A -", mylogfile, True)
+    print_log("-"*100, mylogfile, True)
     if miss_on_a_dl:
         sorted_list = list_dict_custom_sort(miss_on_a_dl, 'flag', ['none'])
         for item in sorted_list:
-            print "\t" + "IP: " + item['ip'] + " | MAC: " + item['mac'] + " | FLAG: " + item['flag']
+            print_log("\t" + "IP: " + item['ip'] + " | MAC: " + item['mac'] + " | FLAG: " + item['flag'], mylogfile, True)
     else:
-        print "\tNo Matches Found"
-    print "-"*100
-    print "-----------------------------"
-    print "Total Both Permanent:.....{0}".format(len(both_perm_remote_dl))
-    print "Total Both None:..........{0}".format(len(both_none_dl))
-    print "Total Unexpected ARPs.....{0}".format(len(misc_flag_dl))
-    print "Total ARP Discrepancies:..{0}".format(len(mac_discrep_dl))
-    print "Total ARP on B, Not A:....{0}".format(len(miss_on_a_dl))
-    print "Total ARP on A, Not B:....{0}".format(len(miss_on_b_dl))
-    print "Total Valid ARPs:.........{0}".format(str(valid_count))
-    print "-----------------------------\n"
+        print_log("\tNo Matches Found", mylogfile, True)
+    print_log("-"*100, mylogfile, True)
+    print_log("-----------------------------", mylogfile, True)
+    print_log("Total Both Permanent:....." + str(len(both_perm_remote_dl)), mylogfile, True)
+    print_log("Total Both None:.........." + str(len(both_none_dl)), mylogfile, True)
+    print_log("Total Unexpected ARPs....." + str(len(misc_flag_dl)), mylogfile, True)
+    print_log("Total ARP Discrepancies:.." + str(len(mac_discrep_dl)), mylogfile, True)
+    print_log("Total ARP on B, Not A:...." + str(len(miss_on_a_dl)), mylogfile, True)
+    print_log("Total ARP on A, Not B:...." + str(len(miss_on_b_dl)), mylogfile, True)
+    print_log("Total Valid ARPs:........." + str(valid_count), mylogfile, True)
+    print_log("-----------------------------\n", mylogfile, True)
 
 # A function to display a list dict in a "pretty" format
 def print_listdict(list_dict, header_show, header_keys):
