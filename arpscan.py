@@ -32,6 +32,15 @@ log_path = ''
 mypwd = ''
 myuser = ''
 
+# Credentials Dictionary
+
+
+# Router IP Hostname Mappings
+host_ip_dict = {"10.159.0.105": "ITE_105", "10.159.0.106": "ITE_106", "10.159.0.107": "ITW_107",
+                "10.159.0.108": "ITW_108", "10.8.0.51": "Boyers_51", "10.8.0.52": "Boyers_52", "10.10.40.70": "Test_1",
+                "10.10.40.71": "Test_2"}
+
+
 # Detect the system enviornment (Windows/Linux/MAC)
 def detect_env():
     """ Purpose: Detect OS and create appropriate path variables
@@ -64,6 +73,8 @@ def getargs(argv):
     except getopt.GetoptError:
         print 'jscan.py -a <host1> -b <host2>'
         sys.exit(2)
+    ip1 = 'A'
+    ip2 = 'B'
     for opt, arg in opts:
         if opt == '-h':
             print 'SYNTAX: arpscan -a <host1> -b <host2>'
@@ -76,6 +87,17 @@ def getargs(argv):
             ip2 = arg
             return arg
 
+# A heading to spruce up the output
+def heading(title):
+    # Get the length of the title
+    title_len = len(title)
+    border_len = title_len + 4
+
+    # Print heading
+    print "-" * border_len
+    print "- " + title + " -"
+    print "-" * border_len
+
 # A function to open a connection to devices and capture any exceptions
 def connect(ip):
     """ Purpose: Attempt to connect to the device
@@ -84,38 +106,85 @@ def connect(ip):
     :param indbase:     -   Boolean if this device is in the database or not, defaults to False if not specified
     :return dev:        -   Returns the device handle if its successfully opened.
     """
-    dev = Device(host=ip, user=myuser, passwd=mypwd, auto_probe=True)
+    dev = Device(host=ip, user=creds['sshkeyuser'], auto_probe=True)
+    #dev = Device(host=ip, user=myuser, password=mypwd, auto_probe=True)
     # Try to open a connection to the device
     try:
         dev.open()
     # If there is an error when opening the connection, display error and exit upgrade process
     except ConnectRefusedError as err:
         message = "Host Reachable, but NETCONF not configured."
-        stdout.write("Connect Fail - " + message + " |")
+        print("Connect Fail - {0}").format(message)
         return False
     except ConnectAuthError as err:
-        message = "Unable to connect with credentials. User:" + username
-        stdout.write("Connect Fail - " + message + " |")
-        return False
+        print("SSH Key Connect Failed using '{0}'").format(creds['sshkeyuser'])
+        dev = backup_connect(ip)
+        if dev:
+            return dev
+        else:
+            return False
     except ConnectTimeoutError as err:
         message = "Timeout error, possible IP reachability issues."
-        stdout.write("Connect Fail - " + message + " |")
+        print("Connect Fail - {0}").format(message)
         return False
     except ProbeError as err:
         message = "Probe timeout, possible IP reachability issues."
-        stdout.write("Connect Fail - " + message + " |")
+        print("Connect Fail - {0}").format(message)
         return False
     except ConnectError as err:
         message = "Unknown connection issue."
-        stdout.write("Connect Fail - " + message + " |")
+        print("Connect Fail - {0}").format(message)
         return False
     except Exception as err:
         message = "Undefined exception."
-        stdout.write("Connect Fail - " + message + " |")
+        print("Connect Fail - {0}").format(message)
         return False
     # If try arguments succeeded...
     else:
+        print("Connected to {0} using SSH Key.").format(ip)
         return dev
+
+def backup_connect(ip):
+    """ Purpose: Attempt to connect to the device
+
+    :param ip:          -   IP of the device
+    :param indbase:     -   Boolean if this device is in the database or not, defaults to False if not specified
+    :return dev:        -   Returns the device handle if its successfully opened.
+    """
+    dev = Device(host=ip, user=creds['username'], password=creds['password'], auto_probe=True)
+    # Try to open a connection to the device
+    try:
+        dev.open()
+    # If there is an error when opening the connection, display error and exit upgrade process
+    except ConnectRefusedError as err:
+        message = "Host Reachable, but NETCONF not configured."
+        print("Connect Fail - {0}").format(message)
+        return False
+    except ConnectAuthError as err:
+        message = "Unable to connect using SSH Key. User:" + username
+        print("Connect Fail - {0}").format(message)
+        return False
+    except ConnectTimeoutError as err:
+        message = "Timeout error, possible IP reachability issues."
+        print("Connect Fail - {0}").format(message)
+        return False
+    except ProbeError as err:
+        message = "Probe timeout, possible IP reachability issues."
+        print("Connect Fail - {0}").format(message)
+        return False
+    except ConnectError as err:
+        message = "Unknown connection issue."
+        print("Connect Fail - {0}").format(message)
+        return False
+    except Exception as err:
+        message = "Undefined exception."
+        print("Connect Fail - {0}").format(message)
+        return False
+    # If try arguments succeeded...
+    else:
+        print("Connected {0} using user/password.").format(ip)
+        return dev
+
 
 # Capture the ARP table from the device
 def get_arp_table(ip):
@@ -124,7 +193,6 @@ def get_arp_table(ip):
     # Open a connection to this IP
     dev = connect(ip)
     if dev:
-        print "Connected to {0}".format(ip)
         # Request ARP table information from device
         arpsw_response = jxmlease.parse_etree(dev.rpc.get_arp_table_information(no_resolve=True))
         for arptableentry in arpsw_response['arp-table-information']['arp-table-entry']:
@@ -177,47 +245,73 @@ def filter_excluded_arps(arp_listdict):
 
 # A function to capture ARP tables and compare them
 def arpscan():
-    print "-"*22
-    print "- Loading ARP Tables -"
-    print "-"*22
+    nameA = ''
+    nameB = ''
+    label = ''
+    ####################
+    # TESTING Code
+    ####################
+    if ip1 == 'A' and ip2 == 'B':
+        # Set the hostnames
+        nameA = "Host_A"
+        nameB = "Host_B"
 
+        router_a_1 = 'itw-spn-a-all-arp-1200.csv'
+        router_a_2 = 'itw-spn-a-all-arp-1202.csv'
+        router_b_1 = 'itw-spn-b-all-arp-1159.csv'
+        router_b_2 = 'itw-spn-b-all-arp-1201.csv'
+
+        router_a_1_ld = csvListDict(os.path.join(dir_path, router_a_1))
+        router_a_2_ld = csvListDict(os.path.join(dir_path, router_a_2))
+        router_b_1_ld = csvListDict(os.path.join(dir_path, router_b_1))
+        router_b_2_ld = csvListDict(os.path.join(dir_path, router_b_2))
+
+        # Run comparisons
+        # First comparison
+        both_perm_remote_dl_1, both_none_dl_1, misc_flag_dl_1, mac_discrep_dl_1, miss_on_a_dl_1, miss_on_b_dl_1, valid_count_1 = \
+            test_compare_capture(router_a_1_ld, router_b_1_ld)
+        # Second comparison
+        both_perm_remote_dl_2, both_none_dl_2, misc_flag_dl_2, mac_discrep_dl_2, miss_on_a_dl_2, miss_on_b_dl_2, valid_count_2 = \
+            test_compare_capture(router_a_2_ld, router_b_2_ld)
     ####################
     # OPERATIONAL Code
-    #'''
-    both_perm_remote_dl_1, both_none_dl_1, misc_flag_dl_1, mac_discrep_dl_1, miss_on_a_dl_1, miss_on_b_dl_1, valid_count_1 = \
-        oper_compare_capture()
-    stdout.write("Pausing for 2 mins...")
-    sys.stdout.flush()
-    time.sleep(120)
-    print "Done Waiting"
-    both_perm_remote_dl_2, both_none_dl_2, misc_flag_dl_2, mac_discrep_dl_2, miss_on_a_dl_2, miss_on_b_dl_2, valid_count_2 = \
-        oper_compare_capture()
-    #'''
+    ####################
+    else:
+        if netaddr.valid_ipv4(ip1) and netaddr.valid_ipv4(ip2):
+            # Set the hostnames and labels
+            if ip1 in host_ip_dict:
+                nameA = host_ip_dict[ip1]
+                if ip2 in host_ip_dict:
+                    nameB = host_ip_dict[ip2]
+                    label = nameA.split('_')[0]
+                else:
+                    nameA = ip1
+                    nameB = ip2
+                    label = ip1 + "_" + ip2
+            else:
+                nameA = ip1
+                nameB = ip2
+                label = ip1 + "_" + ip2
 
-    # TESTING Code
-    '''
-    router_a_1 = 'itw-spn-a-all-arp-1200.csv'
-    router_a_2 = 'itw-spn-a-all-arp-1202.csv'
-    router_b_1 = 'itw-spn-b-all-arp-1159.csv'
-    router_b_2 = 'itw-spn-b-all-arp-1201.csv'
+            #print "Label is {0}".format(label)
 
-    router_a_1_ld = csvListDict(os.path.join(dir_path, router_a_1))
-    router_a_2_ld = csvListDict(os.path.join(dir_path, router_a_2))
-    router_b_1_ld = csvListDict(os.path.join(dir_path, router_b_1))
-    router_b_2_ld = csvListDict(os.path.join(dir_path, router_b_2))
-
-    # Run comparisons
-    both_perm_remote_dl_1, both_none_dl_1, misc_flag_dl_1, mac_discrep_dl_1, miss_on_a_dl_1, miss_on_b_dl_1, valid_count_1 = \
-        test_compare_capture(router_a_1_ld, router_b_1_ld)
-    stdout.write("Pausing for 2 mins...")
-    sys.stdout.flush()
-    time.sleep(120)
-    print "Done Waiting"
-    both_perm_remote_dl_2, both_none_dl_2, misc_flag_dl_2, mac_discrep_dl_2, miss_on_a_dl_2, miss_on_b_dl_2, valid_count_2 = \
-        test_compare_capture(router_a_2_ld, router_b_2_ld)
-    '''
-    ########################
-
+            heading("Running First Comparison")
+            both_perm_remote_dl_1, both_none_dl_1, misc_flag_dl_1, mac_discrep_dl_1, miss_on_a_dl_1, miss_on_b_dl_1, valid_count_1 = \
+                oper_compare_capture()
+            print "-" * 30
+            stdout.write("Pausing for 2 mins...")
+            sys.stdout.flush()
+            time.sleep(120)
+            print "Done Waiting"
+            print "-" * 30
+            heading("Running Second Comparison")
+            both_perm_remote_dl_2, both_none_dl_2, misc_flag_dl_2, mac_discrep_dl_2, miss_on_a_dl_2, miss_on_b_dl_2, valid_count_2 = \
+                oper_compare_capture()
+            print "-" * 30
+        else:
+            print "Detected Invalid IPv4 Formatted IPs ... exiting"
+            exit()
+    ####################
     '''
     # Print Results
     print "Print Results of the First Compare"
@@ -256,12 +350,15 @@ def arpscan():
         elif arp_entry['flag'] == 'none':
             clear_arp_a_list.append("clear arp hostname " + arp_entry['ip'] + "\n")
 
-    create_conf_file(clear_ether_list, clear_arp_a_list, clear_arp_b_list, both_perm)
-    print "Completed creating clear configuration file."
+    heading("Creating Configuration and Results Files")
 
-    # Print Results
-    print_results(both_perm, both_none, misc_flag, mac_discr, miss_on_a, miss_on_b, valid_count_1)
-    print "Completed creating results log file."
+    # Print Configuration To File
+    create_conf_file(clear_ether_list, clear_arp_a_list, clear_arp_b_list, both_perm, label, nameA, nameB)
+
+    # Print Results To File
+    print_results(both_perm, both_none, misc_flag, mac_discr, miss_on_a, miss_on_b, valid_count_1, label, nameA, nameB)
+    print "-" * 30
+
 
 def compare_listdict(listdict1, listdict2):
     common_ld = []
@@ -298,27 +395,31 @@ def test_compare_capture(router_a_ld, router_b_ld):
 def oper_compare_capture():
     blank_list = []
     # Retrieve information from device A
-    if ip1:
-        print "Retrieving ARP table from {0}".format(ip1)
-        arp_mac_listdict1 = get_arp_table(ip1)
-        print "Successfully captured ARP table from {0}".format(ip1)
+    print "Retrieving ARP table ({0})".format(ip1)
+    arp_mac_listdict1 = get_arp_table(ip1)
+    # Make sure retrieval was successful
+    if arp_mac_listdict1:
+        print "--> Successfully captured ARP table"
         arp_mac_listdict1 = filter_excluded_arps(arp_mac_listdict1)
-        print "Completed filtering ARPs for {0}.".format(ip1)
+        print "--> Completed filtering ARP table"
         # Retrieve information from device B
-        if ip2:
-            print "Retrieving ARP table from {0}".format(ip2)
-            arp_mac_listdict2 = get_arp_table(ip2)
-            print "Successfully captured ARP table from {0}".format(ip2)
+        print "Retrieving ARP table ({0})".format(ip2)
+        arp_mac_listdict2 = get_arp_table(ip2)
+        # Make sure retrieval was successful
+        if arp_mac_listdict2:
+            print "--> Successfully captured ARP table"
             arp_mac_listdict2 = filter_excluded_arps(arp_mac_listdict2)
-            print "Completed filtering ARPs for {0}.".format(ip2)
+            print "--> Completed filtering ARP table"
             # Run comparison function and print results and commands
             both_perm_remote_dl, both_none_dl, misc_flag_dl, mac_discrep_dl, miss_on_a_dl, miss_on_b_dl, valid_count = \
                 compare_arp_tables(arp_mac_listdict1, arp_mac_listdict2, ip1, ip2)
             return both_perm_remote_dl, both_none_dl, misc_flag_dl, mac_discrep_dl, miss_on_a_dl, miss_on_b_dl, valid_count
         else:
-            print "Issue populating ARP table for {0}".format(ip1)
+            print("Failed to retrieve ARP table on {0} ... exiting").format(ip2)
+            exit()
     else:
-        print "Issue populating ARP table for {0}".format(ip2)
+        print("Failed to retrieve ARP table on {0} ... exiting").format(ip1)
+        exit()
 
     return blank_list
 
@@ -386,7 +487,7 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
                 break
             else:
                 pass
-        # If not match was made, this ARP deosn't exist on A
+        # If no match was made, this ARP deosn't exist on A
         if no_match:
             # Checks that flag has a value
             if arp2['flag']:
@@ -402,47 +503,61 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
     # Return all lists of dictionaries as a list
     return both_perm_remote_dl, both_none_dl, misc_flag_dl, mac_discrep_dl, miss_on_a_dl, miss_on_b_dl, valid_count
 
-def create_conf_file(clear_ether_list, clear_arp_a_list, clear_arp_b_list, both_perm):
+def create_conf_file(clear_ether_list, clear_arp_a_list, clear_arp_b_list, both_perm, label, nameA, nameB):
     # Create configuration file with clear commands if applicable
     if clear_ether_list or clear_arp_a_list or clear_arp_b_list:
         # Create config file
         now = get_now_time()
-        clear_conf_name = "clear_comds_" + now + "_.conf"
+        clear_conf_name = "clear_comds_" + label + "_" + now + ".conf"
         myconfile = os.path.join(conf_path, clear_conf_name)
-        print_log("##\n## TOTALS:\n## Both Permanent|Remote: " + str(len(both_perm)) + "\n", myconfile)
-        print_log("## Exists on A, not B: " + str(len(clear_arp_a_list)) + "\n", myconfile)
-        print_log("## Exists on B, not A: " + str(len(clear_arp_b_list)) + "\n", myconfile)
-        print_log("##\n", myconfile)
+
+        # Output for the config file
+        print_log("## CLEAR CONFIGURATION COMMANDS", myconfile, True)
+        print_log("## ****************************", myconfile, True)
+        print_log("## Host A: " + nameA + " (" + ip1 + ")", myconfile, True)
+        print_log("## Host B: " + nameB + " (" + ip2 + ")", myconfile, True)
+        print_log("## ****************************", myconfile, True)
+        print_log("## Both Permanent|Remote: " + str(len(both_perm)), myconfile, True)
+        print_log("## Exists on A, not B: " + str(len(clear_arp_a_list)), myconfile, True)
+        print_log("## Exists on B, not A: " + str(len(clear_arp_b_list)), myconfile, True)
+        print_log("## ****************************", myconfile, True)
 
         if clear_ether_list:
             # Loop ether_list and add commands
-            print_log("##\n## Both Permanent|Remote - Run these commands on both devices.\n##\n", myconfile)
+            print_log("##\n## Both Permanent|Remote - Run these commands on both devices.\n##", myconfile, True)
             for command in clear_ether_list:
                 print_log(command, myconfile)
 
         if clear_arp_a_list:
             # Loop arp_list and add commands
-            print_log("##\n## Exists on A, not B - Run these commands on " + ip1 + "\n##\n", myconfile)
+            print_log("##\n## Exists on A, not B - Run these commands on " + ip1 + "\n##", myconfile, True)
             for command in clear_arp_a_list:
                 print_log(command, myconfile)
 
         if clear_arp_a_list:
             # Loop arp_list and add commands
-            print_log("##\n## Exists on B, not A - Run these commands on " + ip2 + "\n##\n", myconfile)
+            print_log("##\n## Exists on B, not A - Run these commands on " + ip2 + "\n##", myconfile, True)
             for command in clear_arp_b_list:
                 print_log(command, myconfile)
 
-def print_results(both_perm_remote_dl, both_none_dl, misc_flag_dl, mac_discrep_dl, miss_on_a_dl, miss_on_b_dl, valid_count):
+        # Print file name
+        print "Completed Config File: {0}".format(clear_conf_name)
+
+
+def print_results(both_perm_remote_dl, both_none_dl, misc_flag_dl, mac_discrep_dl, miss_on_a_dl, miss_on_b_dl, valid_count, label, nameA, nameB):
     # Create log file
     now = get_now_time()
-    log_name = "log_output_" + now + "_.log"
+    log_name = "log_output_" + label + "_" + now + ".log"
     mylogfile = os.path.join(log_path, log_name)
 
-    # Printing the results of the comparison
-    print_log("\n" + "-"*22, mylogfile, True)
-    print_log("- Comparison Results -", mylogfile, True)
-    print_log("-"*22, mylogfile, True)
-    print_log("  - Both ARPs Permanent Remote -", mylogfile, True)
+    # Printing the results of the comparison to the file
+    print_log("ARP COMPARISON RESULTS", mylogfile, True)
+    print_log("****************************", mylogfile, True)
+    print_log("Host A: " + nameA + " (" + ip1 + ")", mylogfile, True)
+    print_log("Host B: " + nameB + " (" + ip2 + ")", mylogfile, True)
+    print_log("****************************", mylogfile, True)
+    print_log("-"*100, mylogfile, True)
+    print_log("- Both ARPs Permanent Remote -", mylogfile, True)
     print_log("-"*100, mylogfile, True)
     if both_perm_remote_dl:
         for item in both_perm_remote_dl:
@@ -450,7 +565,7 @@ def print_results(both_perm_remote_dl, both_none_dl, misc_flag_dl, mac_discrep_d
     else:
         print_log("\tNo Matches Found", mylogfile, True)
     print_log("-"*100, mylogfile, True)
-    print_log("  - Both ARPs None -", mylogfile, True)
+    print_log("- Both ARPs None -", mylogfile, True)
     print_log("-"*100, mylogfile, True)
     if both_none_dl:
         for item in both_none_dl:
@@ -458,7 +573,7 @@ def print_results(both_perm_remote_dl, both_none_dl, misc_flag_dl, mac_discrep_d
     else:
         print_log("\tNo Matches Found", mylogfile, True)
     print_log("-"*100, mylogfile, True)
-    print_log("  - Unexpected ARPs -", mylogfile, True)
+    print_log("- Unexpected ARPs -", mylogfile, True)
     print_log("-"*100, mylogfile, True)
     if misc_flag_dl:
         for item in misc_flag_dl:
@@ -467,7 +582,7 @@ def print_results(both_perm_remote_dl, both_none_dl, misc_flag_dl, mac_discrep_d
     else:
         print_log("\tNo Matches Found", mylogfile, True)
     print_log("-"*100, mylogfile, True)
-    print_log("  - ARP Discrepancies -", mylogfile, True)
+    print_log("- ARP Discrepancies -", mylogfile, True)
     print_log("-"*100, mylogfile, True)
     if mac_discrep_dl:
         for item in mac_discrep_dl:
@@ -475,7 +590,7 @@ def print_results(both_perm_remote_dl, both_none_dl, misc_flag_dl, mac_discrep_d
     else:
         print_log("\tNo Matches Found", mylogfile, True)
     print_log("-"*100, mylogfile, True)
-    print_log("  - ARPs on A, NOT on B -", mylogfile, True)
+    print_log("- ARPs on A, NOT on B -", mylogfile, True)
     print_log("-"*100, mylogfile, True)
     if miss_on_b_dl:
         sorted_list = list_dict_custom_sort(miss_on_b_dl, 'flag', ['none'])
@@ -484,7 +599,7 @@ def print_results(both_perm_remote_dl, both_none_dl, misc_flag_dl, mac_discrep_d
     else:
         print_log("\tNo Matches Found", mylogfile, True)
     print_log("-"*100, mylogfile, True)
-    print_log("  - ARPs on B, NOT on A -", mylogfile, True)
+    print_log("- ARPs on B, NOT on A -", mylogfile, True)
     print_log("-"*100, mylogfile, True)
     if miss_on_a_dl:
         sorted_list = list_dict_custom_sort(miss_on_a_dl, 'flag', ['none'])
@@ -502,6 +617,9 @@ def print_results(both_perm_remote_dl, both_none_dl, misc_flag_dl, mac_discrep_d
     print_log("Total ARP on A, Not B:...." + str(len(miss_on_b_dl)), mylogfile, True)
     print_log("Total Valid ARPs:........." + str(valid_count), mylogfile, True)
     print_log("-----------------------------\n", mylogfile, True)
+
+    # Print file name
+    print "Completed Results File: {0}".format(log_name)
 
 # A function to display a list dict in a "pretty" format
 def print_listdict(list_dict, header_show, header_keys):
@@ -523,22 +641,17 @@ if __name__ == '__main__':
     getargs(sys.argv[1:])
 
     # Credentials
-    myfile = os.path.join(dir_path, 'pass.csv')
-    creds = csv_to_dict(myfile)
-    myuser = creds['username']
-    mypwd = creds['password']
-    print "User: {0} | Pass: {1}".format(myuser, mypwd)
+    global creds
+    creds = {'username': '', 'password': '', 'sshkeyuser': ''}
+    creds_list = line_list(os.path.join(dir_path, 'pass.dat'))
+    for cred in creds_list:
+        elem = cred.split(':')
+        #print('Key: {0} Value: {1}'.format(elem[0], elem[1]))
+        creds[elem[0]] = elem[1]
+
+    #print "User: {0} | Pass: {1}".format(myuser, mypwd)
+    print "***** RUNNING ARPSCAN *****"
 
     # Main Program Loop
-    my_options = ['ARP Scan', 'Quit']
-    while True:
-        answer = getOptionAnswerIndex('Select a task', my_options)
-        print "\n" + "*" * 25
-        if answer == "1":
-            print "Run -> ARP Scan"
-            arpscan()
-        elif answer == "6":
-            print "Goodbye!"
-            quit()
-        else:
-            quit()
+    arpscan()
+    print "***** EXITING ARPSCAN *****"
