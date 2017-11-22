@@ -256,10 +256,15 @@ def arpscan():
         nameA = "Host_A"
         nameB = "Host_B"
 
-        router_a_1 = 'itw-spn-a-all-arp-1200.csv'
-        router_a_2 = 'itw-spn-a-all-arp-1202.csv'
-        router_b_1 = 'itw-spn-b-all-arp-1159.csv'
-        router_b_2 = 'itw-spn-b-all-arp-1201.csv'
+        router_a_1 = 'ite-spine-a-1.csv'
+        router_a_2 = 'ite-spine-a-2.csv'
+        router_b_1 = 'ite-spine-b-1.csv'
+        router_b_2 = 'ite-spine-b-2.csv'
+
+        #router_a_1 = 'itw-spn-a-all-arp-1200.csv'
+        #router_a_2 = 'itw-spn-a-all-arp-1202.csv'
+        #router_b_1 = 'itw-spn-b-all-arp-1159.csv'
+        #router_b_2 = 'itw-spn-b-all-arp-1201.csv'
 
         router_a_1_ld = csvListDict(os.path.join(dir_path, router_a_1))
         router_a_2_ld = csvListDict(os.path.join(dir_path, router_a_2))
@@ -268,11 +273,9 @@ def arpscan():
 
         # Run comparisons
         # First comparison
-        both_perm_remote_dl_1, both_none_dl_1, misc_flag_dl_1, mac_discrep_dl_1, miss_on_a_dl_1, miss_on_b_dl_1, valid_count_1 = \
-            test_compare_capture(router_a_1_ld, router_b_1_ld)
+        both_perm_remote_dl_1, both_none_dl_1, misc_flag_dl_1, mac_discrep_dl_1, miss_on_a_dl_1, miss_on_b_dl_1, valid_count_1 = test_compare_capture(router_a_1_ld, router_b_1_ld)
         # Second comparison
-        both_perm_remote_dl_2, both_none_dl_2, misc_flag_dl_2, mac_discrep_dl_2, miss_on_a_dl_2, miss_on_b_dl_2, valid_count_2 = \
-            test_compare_capture(router_a_2_ld, router_b_2_ld)
+        both_perm_remote_dl_2, both_none_dl_2, misc_flag_dl_2, mac_discrep_dl_2, miss_on_a_dl_2, miss_on_b_dl_2, valid_count_2 = test_compare_capture(router_a_2_ld, router_b_2_ld)
     ####################
     # OPERATIONAL Code
     ####################
@@ -467,14 +470,16 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
                 pass
         # If no match was made, this ARP doesn't exist on B
         if no_match:
+            print "On A, Not B: {0} MAC: {1} FLAG: {2}".format(arp1['ip'], arp1['mac'], arp1['flag'])
             # Checks that flag has a value
             if arp1['flag']:
                 # A is 'permanent remote' and B has no entry
-                if arp1['flag'] == 'perm_remote' or arp2['flag'] == 'none':
+                if arp1['flag'] == 'perm_remote' or arp1['flag'] == 'none':
                     pass
                 else:
                     print "Unmatched flag for IP: {0} MAC: {1} FLAG: {2}".format(arp1['ip'], arp1['mac'], arp1['flag'])
                 miss_on_b_dl.append(arp1)
+                print ""
             # If flag value is missing
             else:
                 print "ERROR: On {0} -> Missing Flag for IP: {1}".format(ip1, arp1['ip'])
@@ -489,6 +494,7 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
                 pass
         # If no match was made, this ARP deosn't exist on A
         if no_match:
+            print "On B, Not A: {0} MAC: {1} FLAG: {2}".format(arp2['ip'], arp2['mac'], arp2['flag'])
             # Checks that flag has a value
             if arp2['flag']:
                 if arp2['flag'] == 'perm_remote' or arp2['flag'] == 'none':
@@ -499,7 +505,8 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
             # If flag value is missing
             else:
                 print "ERROR: On {0} -> Missing Flag for IP: {1}".format(ip2, arp2['ip'])
-
+    print "Leaving..."
+    exit()
     # Return all lists of dictionaries as a list
     return both_perm_remote_dl, both_none_dl, misc_flag_dl, mac_discrep_dl, miss_on_a_dl, miss_on_b_dl, valid_count
 
