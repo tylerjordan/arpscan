@@ -31,15 +31,13 @@ log_path = ''
 # Params
 mypwd = ''
 myuser = ''
-
-# Credentials Dictionary
-
+emailfrom = 'arpscan_script@aquarius.uspto.gov'
+emailto = 'gdnsnetworksupport@uspto.gov,nosengineers@uspto.gov,tim.murphy@uspto.gov'
 
 # Router IP Hostname Mappings
 host_ip_dict = {"10.159.0.105": "ITE_105", "10.159.0.106": "ITE_106", "10.159.0.107": "ITW_107",
                 "10.159.0.108": "ITW_108", "10.8.0.51": "Boyers_51", "10.8.0.52": "Boyers_52", "10.10.40.70": "Test_1",
                 "10.10.40.71": "Test_2"}
-
 
 # Detect the system enviornment (Windows/Linux/MAC)
 def detect_env():
@@ -273,9 +271,11 @@ def arpscan():
 
         # Run comparisons
         # First comparison
-        both_perm_remote_dl_1, both_none_dl_1, misc_flag_dl_1, mac_discrep_dl_1, miss_on_a_dl_1, miss_on_b_dl_1, valid_count_1 = test_compare_capture(router_a_1_ld, router_b_1_ld)
+        both_perm_remote_dl_1, both_none_dl_1, misc_flag_dl_1, mac_discrep_dl_1, miss_on_a_dl_1, miss_on_b_dl_1, valid_count_1 = \
+            test_compare_capture(router_a_1_ld, router_b_1_ld)
         # Second comparison
-        both_perm_remote_dl_2, both_none_dl_2, misc_flag_dl_2, mac_discrep_dl_2, miss_on_a_dl_2, miss_on_b_dl_2, valid_count_2 = test_compare_capture(router_a_2_ld, router_b_2_ld)
+        both_perm_remote_dl_2, both_none_dl_2, misc_flag_dl_2, mac_discrep_dl_2, miss_on_a_dl_2, miss_on_b_dl_2, valid_count_2 = \
+            test_compare_capture(router_a_2_ld, router_b_2_ld)
     ####################
     # OPERATIONAL Code
     ####################
@@ -356,10 +356,15 @@ def arpscan():
     heading("Creating Configuration and Results Files")
 
     # Print Configuration To File
-    create_conf_file(clear_ether_list, clear_arp_a_list, clear_arp_b_list, both_perm, label, nameA, nameB)
+    conf_file = create_conf_file(clear_ether_list, clear_arp_a_list, clear_arp_b_list, both_perm, label, nameA, nameB)
+    # Email Configuration to Engineers
+    email_attachment(conf_file, emailfrom, emailto, label + ' - Config')
 
-    # Print Results To File
-    print_results(both_perm, both_none, misc_flag, mac_discr, miss_on_a, miss_on_b, valid_count_1, label, nameA, nameB)
+    # Print Log Results To File
+    log_file = print_results(both_perm, both_none, misc_flag, mac_discr, miss_on_a, miss_on_b, valid_count_1, label, nameA, nameB)
+    # Email Log to Engineers
+    email_attachment(log_file, emailfrom, emailto, label + ' - Log')
+
     print "-" * 30
 
 
@@ -470,16 +475,17 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
                 pass
         # If no match was made, this ARP doesn't exist on B
         if no_match:
-            print "On A, Not B: {0} MAC: {1} FLAG: {2}".format(arp1['ip'], arp1['mac'], arp1['flag'])
+            #print "On A, Not B: {0} MAC: {1} FLAG: {2}".format(arp1['ip'], arp1['mac'], arp1['flag'])
             # Checks that flag has a value
             if arp1['flag']:
                 # A is 'permanent remote' and B has no entry
                 if arp1['flag'] == 'perm_remote' or arp1['flag'] == 'none':
                     pass
+                elif arp1['flag'] == 'permanent':
+                    pass
                 else:
                     print "Unmatched flag for IP: {0} MAC: {1} FLAG: {2}".format(arp1['ip'], arp1['mac'], arp1['flag'])
                 miss_on_b_dl.append(arp1)
-                print ""
             # If flag value is missing
             else:
                 print "ERROR: On {0} -> Missing Flag for IP: {1}".format(ip1, arp1['ip'])
@@ -494,10 +500,12 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
                 pass
         # If no match was made, this ARP deosn't exist on A
         if no_match:
-            print "On B, Not A: {0} MAC: {1} FLAG: {2}".format(arp2['ip'], arp2['mac'], arp2['flag'])
+            #print "On B, Not A: {0} MAC: {1} FLAG: {2}".format(arp2['ip'], arp2['mac'], arp2['flag'])
             # Checks that flag has a value
             if arp2['flag']:
                 if arp2['flag'] == 'perm_remote' or arp2['flag'] == 'none':
+                    pass
+                elif arp2['flag'] == 'permanent':
                     pass
                 else:
                     print "Unmatched flag for IP: {0} MAC: {1} FLAG: {2}".format(arp2['ip'], arp2['mac'], arp2['flag'])
@@ -506,7 +514,7 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
             else:
                 print "ERROR: On {0} -> Missing Flag for IP: {1}".format(ip2, arp2['ip'])
     print "Leaving..."
-    exit()
+
     # Return all lists of dictionaries as a list
     return both_perm_remote_dl, both_none_dl, misc_flag_dl, mac_discrep_dl, miss_on_a_dl, miss_on_b_dl, valid_count
 
@@ -550,6 +558,7 @@ def create_conf_file(clear_ether_list, clear_arp_a_list, clear_arp_b_list, both_
         # Print file name
         print "Completed Config File: {0}".format(clear_conf_name)
 
+    return myconfile
 
 def print_results(both_perm_remote_dl, both_none_dl, misc_flag_dl, mac_discrep_dl, miss_on_a_dl, miss_on_b_dl, valid_count, label, nameA, nameB):
     # Create log file
@@ -627,6 +636,8 @@ def print_results(both_perm_remote_dl, both_none_dl, misc_flag_dl, mac_discrep_d
 
     # Print file name
     print "Completed Results File: {0}".format(log_name)
+
+    return mylogfile
 
 # A function to display a list dict in a "pretty" format
 def print_listdict(list_dict, header_show, header_keys):

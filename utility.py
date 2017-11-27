@@ -11,9 +11,23 @@ import glob
 import json
 import operator
 import os
+import smtplib
+import mimetypes
+
+# Misc Libraries
 from os import listdir
 from os.path import isfile, join
 from sys import stdout
+
+# Email Libraries
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email import encoders
+from email.message import Message
+from email.mime.audio import MIMEAudio
+from email.mime.base import MIMEBase
+from email.mime.image import MIMEImage
+from email.mime.text import MIMEText
 
 #--------------------------------------
 # ANSWER METHODS
@@ -793,3 +807,35 @@ def line_list(filepath):
                 linelist.append(line.replace('\n', '').replace('\r', ''))
         f.close()
         return linelist
+
+# Create and send an email with defined parameters
+def email_attachment(attached_file, emailfrom, emailto, subject):
+    # Nececssary Email Parameters
+    msg = MIMEMultipart()
+    msg['Subject'] = subject
+    msg['From'] = emailfrom
+    msg['To'] = emailto
+
+    # Attach file to email
+    ctype, encoding = mimetypes.guess_type(attached_file)
+    if ctype is None or encoding is not None:
+        ctype = "application/octet-stream"
+    maintype, subtype = ctype.split("/", 1)
+    fp = open(attached_file, 'rb')
+    attachment = MIMEBase(maintype, subtype)
+    attachment.set_payload(fp.read())
+    fp.close()
+    encoders.encode_base64(attachment)
+    attachment.add_header('Content-Disposition', 'attachment', filename=attached_file)
+    msg.attach(attachment)
+
+    # Send email
+    print "Running Email Function..."
+    try:
+        server = smtplib.SMTP('mailer.uspto.gov:25')
+        server.sendmail(emailfrom, emailto.split(','), msg.as_string())
+    except Exception as err:
+        print "--> Error Sending Mail: {0}".format(err)
+    else:
+        print "--> Successfully Submitted Email"
+        server.quit
