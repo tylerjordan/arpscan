@@ -447,7 +447,7 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
 
     # Compares A against B
     for arp1 in arptab1:
-        no_match= True
+        no_ip_match = True
         for arp2 in arptab2:
             # If these records have the same IP
             if arp1['ip'] == arp2['ip']:
@@ -466,15 +466,20 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
                                              'ip_b': arp2['ip'], 'mac_b': arp2['mac'], 'flag_b': arp2['flag']})
                 # If these records have different MACs
                 else:
+                    #print "Diff MACs - IP: {0} MAC A: {1} MAC B: {2} FLAG A: {3} FLAG B: {4}".format(arp1['ip'],
+                    #                                                                                arp1['mac'],
+                    #                                                                                arp2['mac'],
+                    #                                                                                arp1['flag'],
+                    #                                                                                arp2['flag'])
                     mac_discrep_dl.append({'ip': arp1['ip'], 'mac_a': arp1['mac'], 'mac_b': arp2['mac']})
-                no_match = False
+                no_ip_match = False
                 break
             # If these records have different IPs
             else:
                 # Move onto next IP...
                 pass
         # If no match was made, this ARP doesn't exist on B
-        if no_match:
+        if no_ip_match:
             #print "On A, Not B: {0} MAC: {1} FLAG: {2}".format(arp1['ip'], arp1['mac'], arp1['flag'])
             # Checks that flag has a value
             if arp1['flag']:
@@ -491,15 +496,15 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
                 print "ERROR: On {0} -> Missing Flag for IP: {1}".format(ip1, arp1['ip'])
     # Compares B against A
     for arp2 in arptab2:
-        no_match = True
+        no_ip_match = True
         for arp1 in arptab1:
             if arp2['ip'] == arp1['ip']:
-                no_match = False
+                no_ip_match = False
                 break
             else:
                 pass
         # If no match was made, this ARP deosn't exist on A
-        if no_match:
+        if no_ip_match:
             #print "On B, Not A: {0} MAC: {1} FLAG: {2}".format(arp2['ip'], arp2['mac'], arp2['flag'])
             # Checks that flag has a value
             if arp2['flag']:
@@ -513,7 +518,6 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
             # If flag value is missing
             else:
                 print "ERROR: On {0} -> Missing Flag for IP: {1}".format(ip2, arp2['ip'])
-    print "Leaving..."
 
     # Return all lists of dictionaries as a list
     return both_perm_remote_dl, both_none_dl, misc_flag_dl, mac_discrep_dl, miss_on_a_dl, miss_on_b_dl, valid_count
@@ -554,6 +558,7 @@ def create_conf_file(clear_ether_list, clear_arp_a_list, clear_arp_b_list, both_
             print_log("##\n## Exists on B, not A - Run these commands on " + ip2 + "\n##", myconfile, True)
             for command in clear_arp_b_list:
                 print_log(command, myconfile)
+        print_log("##", myconfile, False)
 
         # Print file name
         print "Completed Config File: {0}".format(clear_conf_name)
