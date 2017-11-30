@@ -86,17 +86,6 @@ def getargs(argv):
             ip2 = arg
             return arg
 
-# A heading to spruce up the output
-def heading(title):
-    # Get the length of the title
-    title_len = len(title)
-    border_len = title_len + 4
-
-    # Print heading
-    print "-" * border_len
-    print "- " + title + " -"
-    print "-" * border_len
-
 # A function to open a connection to devices and capture any exceptions
 def connect(ip):
     """ Purpose: Attempt to connect to the device
@@ -308,7 +297,7 @@ def arpscan():
 
             #print "Label is {0}".format(label)
 
-            print heading("Running First Comparison")
+            print subHeading("Running First Comparison", 5)
             both_perm_remote_dl_1, both_none_dl_1, misc_flag_dl_1, mac_discrep_dl_1, miss_on_a_dl_1, miss_on_b_dl_1, valid_count_1 = \
                 oper_compare_capture()
             print "-" * 30
@@ -317,7 +306,7 @@ def arpscan():
             time.sleep(120)
             print "Done Waiting"
             print "-" * 30
-            print heading("Running Second Comparison")
+            print subHeading("Running Second Comparison", 5)
             both_perm_remote_dl_2, both_none_dl_2, misc_flag_dl_2, mac_discrep_dl_2, miss_on_a_dl_2, miss_on_b_dl_2, valid_count_2 = \
                 oper_compare_capture()
             print "-" * 30
@@ -363,7 +352,7 @@ def arpscan():
         elif arp_entry['flag'] == 'none':
             clear_arp_a_list.append("clear arp hostname " + arp_entry['ip'] + "\n")
 
-    heading("Creating Configuration and Results Files")
+    print subHeading("Creating Configuration and Results Files", 5)
 
     # Print Configuration To File
     conf_file = create_conf_file(clear_ether_list, clear_arp_a_list, clear_arp_b_list, both_perm, label, nameA, nameB)
