@@ -13,6 +13,7 @@ import sys
 
 from jnpr.junos import *
 from jnpr.junos.exception import *
+from netaddr import *
 from utility import *
 
 from ncclient import manager  # https://github.com/ncclient/ncclient
@@ -214,10 +215,21 @@ def get_arp_table(ip):
 def filter_excluded_arps(arp_listdict):
     # New filtered listdict
     filtered_listdict = []
+    expanded_list = []
 
     # Load exclusion list
     ip_list = line_list(os.path.join(dir_path, 'exclusion_list.txt'))
 
+    # Process exclusion list to expand any CIDR network ranges
+    '''
+    for line in ip_list:
+        #print "Line: {0}".format(line)
+        if netaddr.valid_ipv4(line.split("/")[0]):
+            #print "-- Valid IP"
+            for ip in IPSet([line]):
+                expanded_list.append(ip)
+                #print "--> {0}".format(ip)
+    '''
     # Loop over the list and omit any that match from the exclusion list
     # Make sure the ip_list has entries
     if ip_list:
@@ -226,8 +238,14 @@ def filter_excluded_arps(arp_listdict):
             matched = False
             for excluded_ip in ip_list:
                 # If the IP is matched, it is uninteresting
-                if arpentry['ip'] == excluded_ip:
+                if "/" in excluded_ip:
+                    if IPAddress(arpentry['ip']) in IPNetwork(excluded_ip):
+                        print "Excluding: {0} From: {1}".format(arpentry['ip'], excluded_ip)
+                        matched = True
+                        break
+                elif arpentry['ip'] == excluded_ip:
                     # ARP is excluded
+                    print "Excluding: {0}".format(arpentry['ip'])
                     #print "Excluded this IP: {0}".format(arpentry['ip'])
                     matched = True
                     break
@@ -298,7 +316,7 @@ def arpscan():
 
             #print "Label is {0}".format(label)
 
-            heading("Running First Comparison")
+            print heading("Running First Comparison")
             both_perm_remote_dl_1, both_none_dl_1, misc_flag_dl_1, mac_discrep_dl_1, miss_on_a_dl_1, miss_on_b_dl_1, valid_count_1 = \
                 oper_compare_capture()
             print "-" * 30
@@ -307,7 +325,7 @@ def arpscan():
             time.sleep(120)
             print "Done Waiting"
             print "-" * 30
-            heading("Running Second Comparison")
+            print heading("Running Second Comparison")
             both_perm_remote_dl_2, both_none_dl_2, misc_flag_dl_2, mac_discrep_dl_2, miss_on_a_dl_2, miss_on_b_dl_2, valid_count_2 = \
                 oper_compare_capture()
             print "-" * 30
