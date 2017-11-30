@@ -220,16 +220,6 @@ def filter_excluded_arps(arp_listdict):
     # Load exclusion list
     ip_list = line_list(os.path.join(dir_path, 'exclusion_list.txt'))
 
-    # Process exclusion list to expand any CIDR network ranges
-    '''
-    for line in ip_list:
-        #print "Line: {0}".format(line)
-        if netaddr.valid_ipv4(line.split("/")[0]):
-            #print "-- Valid IP"
-            for ip in IPSet([line]):
-                expanded_list.append(ip)
-                #print "--> {0}".format(ip)
-    '''
     # Loop over the list and omit any that match from the exclusion list
     # Make sure the ip_list has entries
     if ip_list:
@@ -238,14 +228,16 @@ def filter_excluded_arps(arp_listdict):
             matched = False
             for excluded_ip in ip_list:
                 # If the IP is matched, it is uninteresting
+                # Checks if IP is masked or not
                 if "/" in excluded_ip:
+                    # Checks if the provided IP is in the excluded network
                     if IPAddress(arpentry['ip']) in IPNetwork(excluded_ip):
-                        print "Excluding: {0} From: {1}".format(arpentry['ip'], excluded_ip)
+                        #print "Excluding: {0} From: {1}".format(arpentry['ip'], excluded_ip)
                         matched = True
                         break
                 elif arpentry['ip'] == excluded_ip:
                     # ARP is excluded
-                    print "Excluding: {0}".format(arpentry['ip'])
+                    #print "Excluding: {0}".format(arpentry['ip'])
                     #print "Excluded this IP: {0}".format(arpentry['ip'])
                     matched = True
                     break
@@ -255,7 +247,7 @@ def filter_excluded_arps(arp_listdict):
         return filtered_listdict
     # This executes if the ip_list is empty, return the listdict unchanged
     else:
-        print "No IPs filtered using exclusion list."
+        print "No IPs in the exclusion list. Skipping."
         return arp_listdict
 
 
