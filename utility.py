@@ -795,7 +795,8 @@ def line_list(filepath):
         f = open(filepath, 'r')
     except IOError as ioex:
         if ioex.errno == 2:
-            print "No IPList Defined"
+            #print "No IP List Defined"
+            pass
         else:
             print 'IOERROR: Unable to open file: {0} | File: {1}'.format(err, filepath)
         return False

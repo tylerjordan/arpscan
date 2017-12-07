@@ -65,21 +65,27 @@ def getargs(argv):
     # Global variables
     global ip1
     global ip2
+    global pushChanges
 
     # Interprets and handles the command line arguments
     try:
-        opts, args = getopt.getopt(argv, "ha:b:", ["ip1=", "ip2="])
+        opts, args = getopt.getopt(argv, "hta:b:", ["ip1=", "ip2="])
     except getopt.GetoptError:
         print 'jscan.py -a <host1> -b <host2>'
         sys.exit(2)
     ip1 = 'A'
     ip2 = 'B'
+    pushChanges = False
     for opt, arg in opts:
         if opt == '-h':
-            print 'SYNTAX: arpscan -a <host1> -b <host2>'
+            print 'Usage: arpscan [-h] [-t] -a <host1> -b <host2>'
             print '  -a : (REQUIRED) First host IP'
             print '  -b : (REQUIRED) Second host IP'
+            print '  -t : (OPTIONAL) Apply clear commands to the hosts'
+            print '  -h : (OPTIONAL) Show this help information'
             sys.exit()
+        elif opt in '-t':
+            pushChanges = True
         elif opt in ("-a", "--ip1"):
             ip1 = arg
         elif opt in ("-b", "--ip2"):
@@ -332,40 +338,108 @@ def arpscan():
     miss_on_a = compare_listdict(miss_on_a_dl_1, miss_on_a_dl_2)
     miss_on_b = compare_listdict(miss_on_b_dl_1, miss_on_b_dl_2)
 
-    # Create clear commands
-    clear_ether_list = []
-    clear_arp_a_list = []
-    clear_arp_b_list = []
+    # Clear file parameter lists
+    clear_ether_list_both = []
+    clear_ether_list_a = []
+    clear_ether_list_b = []
+    clear_arp_list_a = []
+    clear_arp_list_b = []
 
+    # Clear send parameter list of dictionaries
+    clear_cmds_a = []
+    clear_cmds_b = []
+
+    # Add components to correct lists
     for arp_entry in both_perm:
-        clear_ether_list.append("clear ethernet-switching table " + arp_entry['mac'] + "\n")
+        clear_ether_list_both.append("clear ethernet-switching table " + arp_entry['mac'] + "\n")
+        clear_cmds_a.append({'rpc': 'est', 'mac': arp_entry['mac']})
+        clear_cmds_b.append({'rpc': 'est', 'mac': arp_entry['mac']})
     for arp_entry in both_none:
-        clear_ether_list.append("clear ethernet-switching table " + arp_entry['mac'] + "\n")
+        clear_ether_list_both.append("clear ethernet-switching table " + arp_entry['mac'] + "\n")
+        clear_cmds_a.append({'rpc': 'est', 'mac': arp_entry['mac']})
+        clear_cmds_b.append({'rpc': 'est', 'mac': arp_entry['mac']})
     for arp_entry in miss_on_a:
         if arp_entry['flag'] == 'perm_remote':
-            clear_ether_list.append("clear ethernet-switching table " + arp_entry['mac'] + "\n")
+            clear_ether_list_b.append("clear ethernet-switching table " + arp_entry['mac'] + "\n")
+            clear_cmds_b.append({'rpc': 'est', 'mac': arp_entry['mac']})
         elif arp_entry['flag'] == 'none':
-            clear_arp_b_list.append("clear arp hostname " + arp_entry['ip'] + "\n")
+            clear_arp_list_b.append("clear arp hostname " + arp_entry['ip'] + "\n")
+            clear_cmds_b.append({'rpc': 'arp', 'ip': arp_entry['ip']})
     for arp_entry in miss_on_b:
         if arp_entry['flag'] == 'perm_remote':
-            clear_ether_list.append("clear ethernet-switching table " + arp_entry['mac'] + "\n")
+            clear_ether_list_a.append("clear ethernet-switching table " + arp_entry['mac'] + "\n")
+            clear_cmds_a.append({'rpc': 'est', 'mac': arp_entry['mac']})
         elif arp_entry['flag'] == 'none':
-            clear_arp_a_list.append("clear arp hostname " + arp_entry['ip'] + "\n")
+            clear_arp_list_a.append("clear arp hostname " + arp_entry['ip'] + "\n")
+            clear_cmds_a.append({'rpc': 'arp', 'ip': arp_entry['ip']})
 
     print subHeading("Creating Configuration and Results Files", 5)
 
     # Print Configuration To File
-    conf_file = create_conf_file(clear_ether_list, clear_arp_a_list, clear_arp_b_list, both_perm, label, nameA, nameB)
+    conf_file = create_conf_file(clear_ether_list_both, clear_ether_list_a, clear_ether_list_b, clear_arp_list_a,
+                                 clear_arp_list_b, label, nameA, nameB)
     # Email Configuration to Engineers
     email_attachment(conf_file, emailfrom, emailto, label + ' - Config')
 
     # Print Log Results To File
-    log_file = print_results(both_perm, both_none, misc_flag, mac_discr, miss_on_a, miss_on_b, valid_count_1, label, nameA, nameB)
+    log_file = print_results(both_perm, both_none, misc_flag, mac_discr, miss_on_a, miss_on_b, valid_count_1, label,
+                             nameA, nameB)
     # Email Log to Engineers
     email_attachment(log_file, emailfrom, emailto, label + ' - Log')
 
+    # Request clear commands on the appropriate device
+    if pushChanges:
+        # Make RPC requests to IP1 device
+        push_changes(ip1, clear_cmds_a)
+        pass
+
     print "-" * 30
 
+def push_changes(host_ip, clear_cmds):
+    # Try to connect to the host
+    stdout.write("-> Connecting to " + host_ip + " ... ")
+    dev = connect(host_ip)
+    if dev:
+        print "Connected!"
+        # Loop over the dictionary list
+        if clear_cmds:
+            for entry in clear_cmds:
+                if entry['rpc'] == 'est':
+                    stdout.write("--> Attempting to clear {0} ...").format(entry['mac'])
+                    try:
+                        rsp = dev.rpc.clear_ethernet_switching_table(mac=entry['mac'])
+                    except Exception as err:
+                        print "Problem with clearing entry: {0}".format(err)
+                elif entry['rpc'] == 'arp':
+                    stdout.write("--> Attempting to clear {0} ...").format(entry['ip'])
+                    try:
+                        rsp = dev.rpc.clear_arp_table(hostname=entry['ip'])
+                    except Exception as err:
+                        print "Problem with clearing entry: {0}".format(err)
+                command_output += "\n" + hostname + ": Executing -> {0}\n".format(command)
+                # com = dev.cli_to_rpc_string(command)
+                # print "Command: {0}\nRPC: {1}\n".format(command, com)
+                # if com is None:
+                try:
+                    results = dev.cli(command, warning=False)
+                except Exception as err:
+                    stdout.write("\n")
+                    screen_and_log("{0}: Error executing '{1}'. ERROR: {2}\n".format(ip, command, err), err_log)
+                    stdout.write("\n")
+                else:
+                    if results:
+                        command_output += results
+                        got_output = True
+                    stdout.write(".")
+                    stdout.flush()
+            if got_output:
+                devs_with_output.append(ip)
+                screen_and_log(command_output, output_log)
+                stdout.write("\n")
+            else:
+                devs_no_output.append(ip)
+                stdout.write(" No Output!\n")
+                # If no commands are provided, run the get_chassis_inventory on devices
 
 def compare_listdict(listdict1, listdict2):
     common_ld = []
@@ -521,48 +595,161 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
     # Return all lists of dictionaries as a list
     return both_perm_remote_dl, both_none_dl, misc_flag_dl, mac_discrep_dl, miss_on_a_dl, miss_on_b_dl, valid_count
 
-def create_conf_file(clear_ether_list, clear_arp_a_list, clear_arp_b_list, both_perm, label, nameA, nameB):
+def create_conf_file(clear_ether_list_both, clear_ether_list_a, clear_ether_list_b, clear_arp_list_a, clear_arp_list_b,
+                     label, nameA, nameB):
+    # Create config file
+    now = get_now_time()
+    clear_conf_name = "clear_comds_" + label + "_" + now + ".conf"
+    myconfile = os.path.join(conf_path, clear_conf_name)
+
+    # Output for the config file
+    print_log("## CLEAR CONFIGURATION COMMANDS", myconfile, True)
+    print_log("## ****************************", myconfile, True)
+    print_log("## Host A: " + nameA + " (" + ip1 + ")", myconfile, True)
+    print_log("## Host B: " + nameB + " (" + ip2 + ")", myconfile, True)
+    print_log("## ****************************", myconfile, True)
+    print_log("## Both entries 'PERMANENT REMOTE' or NONE: " + str(len(clear_ether_list_both)), myconfile, True)
+    print_log("## Entries in ETHER-SWITCHING on A, not B: " + str(len(clear_ether_list_a)), myconfile, True)
+    print_log("## Entries in ETHER-SWITCHING on B, not A: " + str(len(clear_ether_list_b)), myconfile, True)
+    print_log("## Entries in ARP on A, not B: " + str(len(clear_arp_list_a)), myconfile, True)
+    print_log("## Entries in ARP on B, not A: " + str(len(clear_arp_list_b)), myconfile, True)
+    print_log("## ****************************", myconfile, True)
+
     # Create configuration file with clear commands if applicable
-    if clear_ether_list or clear_arp_a_list or clear_arp_b_list:
-        # Create config file
-        now = get_now_time()
-        clear_conf_name = "clear_comds_" + label + "_" + now + ".conf"
-        myconfile = os.path.join(conf_path, clear_conf_name)
+    if clear_ether_list_both:
+        # Loop ether_list and add commands
+        print_log("##\n## Both entries 'Permanent Remote' or None - Run these commands on both devices.\n##", myconfile, True)
+        for command in clear_ether_list_both:
+            print_log(command, myconfile)
 
-        # Output for the config file
-        print_log("## CLEAR CONFIGURATION COMMANDS", myconfile, True)
-        print_log("## ****************************", myconfile, True)
-        print_log("## Host A: " + nameA + " (" + ip1 + ")", myconfile, True)
-        print_log("## Host B: " + nameB + " (" + ip2 + ")", myconfile, True)
-        print_log("## ****************************", myconfile, True)
-        print_log("## Both Permanent|Remote: " + str(len(both_perm)), myconfile, True)
-        print_log("## Exists on A, not B: " + str(len(clear_arp_a_list)), myconfile, True)
-        print_log("## Exists on B, not A: " + str(len(clear_arp_b_list)), myconfile, True)
-        print_log("## ****************************", myconfile, True)
+    if clear_ether_list_a:
+        # Loop ether_list and add commands
+        print_log("##\n## Exists in ethernet-switching table as permanent|remote on A, not B - Run these commands on " + ip1 + "\n##", myconfile, True)
+        for command in clear_ether_list_a:
+            print_log(command, myconfile)
 
-        if clear_ether_list:
-            # Loop ether_list and add commands
-            print_log("##\n## Both Permanent|Remote - Run these commands on both devices.\n##", myconfile, True)
-            for command in clear_ether_list:
-                print_log(command, myconfile)
+    if clear_ether_list_b:
+        # Loop ether_list and add commands
+        print_log("##\n## Exists in ethernet-switching table as permanent|remote on B, not A - Run these commands on " + ip2 + "\n##", myconfile, True)
+        for command in clear_ether_list_b:
+            print_log(command, myconfile)
 
-        if clear_arp_a_list:
-            # Loop arp_list and add commands
-            print_log("##\n## Exists on A, not B - Run these commands on " + ip1 + "\n##", myconfile, True)
-            for command in clear_arp_a_list:
-                print_log(command, myconfile)
+    if clear_arp_list_a:
+        # Loop arp_list and add commands
+        print_log("##\n## Exists in arp table on A, not B - Run these commands on " + ip1 + "\n##", myconfile, True)
+        for command in clear_arp_list_a:
+            print_log(command, myconfile)
 
-        if clear_arp_a_list:
-            # Loop arp_list and add commands
-            print_log("##\n## Exists on B, not A - Run these commands on " + ip2 + "\n##", myconfile, True)
-            for command in clear_arp_b_list:
-                print_log(command, myconfile)
-        print_log("##", myconfile, False)
+    if clear_arp_list_b:
+        # Loop arp_list and add commands
+        print_log("##\n## Exists in arp table on B, not A - Run these commands on " + ip2 + "\n##", myconfile, True)
+        for command in clear_arp_list_b:
+            print_log(command, myconfile)
+    print_log("##", myconfile, False)
 
-        # Print file name
-        print "Completed Config File: {0}".format(clear_conf_name)
+    # Print file name
+    print "Completed Config File: {0}".format(clear_conf_name)
 
     return myconfile
+
+# Function for running operational commands to multiple devices
+def arp_commands(arp_clear=None, ethsw_clear=None):
+    print "*" * 50 + "\n" + " " * 10 + "ARP CLEAR COMMANDS\n" + "*" * 50
+    # Provide selection for sending a single command or multiple commands from a file
+    if arp_clear:
+        rpc_command = clear_arp_table
+
+    if my_ips:
+        command_list = []
+        print "\n" + "*" * 110 + "\n"
+        command_list = getMultiInputAnswer("Enter a command to run")
+
+        if getTFAnswer("Continue with operational requests?"):
+            output_log = create_timestamped_log("oper_output_", "log")
+            err_log = create_timestamped_log("oper_err_", "log")
+            # Header of operational command output
+            screen_and_log(starHeading("OPERATIONAL COMMANDS OUTPUT", 110), output_log)
+            screen_and_log(('User: {0}\n').format(username), output_log)
+            screen_and_log(('Performed: {0}\n').format(get_now_time()), output_log)
+            screen_and_log(('Output Log: {0}\n').format(output_log), output_log)
+            screen_and_log(('Error Log: {0}\n').format(err_log), output_log)
+            screen_and_log(starHeading("COMMANDS EXECUTED", 110), output_log)
+            for command in command_list:
+                screen_and_log(' -> {0}\n'.format(command), output_log)
+            screen_and_log('*' * 110 + '\n', output_log)
+
+            # Loop over commands and devices
+            devs_unreachable = []
+            devs_no_output = []
+            devs_with_output = []
+            loop = 0
+            try:
+                screen_and_log("-" * 110 + "\n", output_log)
+                for ip in my_ips:
+                    command_output = ""
+                    loop += 1
+                    stdout.write("-> Connecting to " + ip + " ... ")
+                    dev = connect(ip)
+                    if dev:
+                        print "Connected!"
+                        hostname = dev.facts['hostname']
+                        if not hostname:
+                            hostname = "Unknown"
+                        got_output = False
+                        # Loop over the commands provided
+                        if command_list:
+                            stdout.write(hostname + ": Executing commands ")
+                            for command in command_list:
+                                command_output += "\n" + hostname + ": Executing -> {0}\n".format(command)
+                                #com = dev.cli_to_rpc_string(command)
+                                #print "Command: {0}\nRPC: {1}\n".format(command, com)
+                                #if com is None:
+                                try:
+                                    results = dev.cli(command, warning=False)
+                                except Exception as err:
+                                    stdout.write("\n")
+                                    screen_and_log("{0}: Error executing '{1}'. ERROR: {2}\n".format(ip, command, err), err_log)
+                                    stdout.write("\n")
+                                else:
+                                    if results:
+                                        command_output += results
+                                        got_output = True
+                                    stdout.write(".")
+                                    stdout.flush()
+                            if got_output:
+                                devs_with_output.append(ip)
+                                screen_and_log(command_output, output_log)
+                                stdout.write("\n")
+                            else:
+                                devs_no_output.append(ip)
+                                stdout.write(" No Output!\n")
+                        # If no commands are provided, run the get_chassis_inventory on devices
+                        else:
+                            get_chassis_inventory(dev, hostname)
+                        # Close connection to device
+                        try:
+                            dev.close()
+                        except TimeoutExpiredError as err:
+                            print "Error: {0}".format(err)
+                            break
+                    else:
+                        screen_and_log("{0}: Unable to connect\n".format(ip), err_log)
+                        devs_unreachable.append(ip)
+                screen_and_log("-" * 110 + "\n", output_log)
+                screen_and_log(starHeading("COMMANDS COMPLETED", 110), output_log)
+                # Results of commands
+                screen_and_log(starHeading("PROCESS SUMMARY", 110), output_log)
+                screen_and_log("Devices With Output:  {0}\n".format(len(devs_with_output)), output_log)
+                screen_and_log("Devices No Output:    {0}\n".format(len(devs_no_output)), output_log)
+                screen_and_log("Devices Unreachable:  {0}\n".format(len(devs_unreachable)), output_log)
+                screen_and_log("Total Devices:        {0}\n".format(len(my_ips)), output_log)
+                screen_and_log("*" * 110 + "\n", output_log)
+            except KeyboardInterrupt:
+                print "Exiting Procedure..."
+        else:
+            print "\n!!! Configuration deployment aborted... No changes made !!!\n"
+    else:
+        print "\n!! Configuration deployment aborted... No IPs defined !!!\n"
 
 def print_results(both_perm_remote_dl, both_none_dl, misc_flag_dl, mac_discrep_dl, miss_on_a_dl, miss_on_b_dl, valid_count, label, nameA, nameB):
     # Create log file
