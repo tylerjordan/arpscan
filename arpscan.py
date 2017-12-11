@@ -345,6 +345,20 @@ def arpscan():
     clear_arp_list_a = []
     clear_arp_list_b = []
 
+    print subHeading("Creating Log, Configuration, and Results Files", 5)
+
+    # Print Configuration To File
+    conf_file = create_conf_file(clear_ether_list_both, clear_ether_list_a, clear_ether_list_b, clear_arp_list_a,
+                                 clear_arp_list_b, label, nameA, nameB)
+    # Email Configuration to Engineers
+    email_attachment(conf_file, emailfrom, emailto, label + ' - Config')
+
+    # Print Log Results To File
+    log_file = print_results(both_perm, both_none, misc_flag, mac_discr, miss_on_a, miss_on_b, valid_count_1, label,
+                             nameA, nameB)
+    # Email Log to Engineers
+    email_attachment(log_file, emailfrom, emailto, label + ' - Log')
+
     # Clear send parameter list of dictionaries
     clear_cmds_a = []
     clear_cmds_b = []
@@ -372,20 +386,6 @@ def arpscan():
         elif arp_entry['flag'] == 'none':
             clear_arp_list_a.append("clear arp hostname " + arp_entry['ip'] + "\n")
             clear_cmds_a.append({'rpc': 'arp', 'ip': arp_entry['ip']})
-
-    print subHeading("Creating Configuration and Results Files", 5)
-
-    # Print Configuration To File
-    conf_file = create_conf_file(clear_ether_list_both, clear_ether_list_a, clear_ether_list_b, clear_arp_list_a,
-                                 clear_arp_list_b, label, nameA, nameB)
-    # Email Configuration to Engineers
-    email_attachment(conf_file, emailfrom, emailto, label + ' - Config')
-
-    # Print Log Results To File
-    log_file = print_results(both_perm, both_none, misc_flag, mac_discr, miss_on_a, miss_on_b, valid_count_1, label,
-                             nameA, nameB)
-    # Email Log to Engineers
-    email_attachment(log_file, emailfrom, emailto, label + ' - Log')
 
     # Request clear commands on the appropriate device
     if pushChanges:
