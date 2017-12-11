@@ -399,7 +399,9 @@ def arpscan():
             # Make RPC requests to IP2 device
             #print_listdict(clear_cmds_b, headings, keys)
             cmd_results_b = push_changes(ip2, clear_cmds_b)
-            create_change_file(cmd_results_a, cmd_results_b)
+            results_file = create_results_file(cmd_results_a, cmd_results_b)
+            # Email Results to Engineers
+            email_attachment(results_file, emailfrom, emailto, label + ' - Log')
 
     print "-" * 30
 
@@ -425,23 +427,23 @@ def push_changes(host_ip, clear_cmds):
                         rsp = True
                 except RpcError as err:
                     print "Failed: RPC Error"
-                    entry['result'] = "Failed"
+                    entry['success'] = False
                     entry['error'] = err
                 except RpcTimeoutError as err:
                     print "Failed: RPC Timeout Error"
-                    entry['result'] = "Failed"
+                    entry['success'] = False
                     entry['error'] = err
                 except Exception as err:
                     print "Failed: Unknown Error"
-                    entry['result'] = "Failed"
+                    entry['success'] = False
                     entry['error'] = err
                 else:
                     if rsp:
                         print "Successful"
-                        entry['result'] = "Success"
+                        entry['success'] = True
                     else:
                         rsp = jxmlease.parse_etree(rsp)
-                        entry['result'] = "Failed"
+                        entry['success'] = False
                         etnry['error'] = rsp
                 # Regardless of the result, there should be a result
                 cmd_results.append(entry)
@@ -605,70 +607,112 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
     # Return all lists of dictionaries as a list
     return both_perm_remote_dl, both_none_dl, misc_flag_dl, mac_discrep_dl, miss_on_a_dl, miss_on_b_dl, valid_count
 
-def create_change_file(cmd_results_a, cmd_results_b):
+def create_results_file(cmd_results_a, cmd_results_b):
+    # Storage Variables
+    a_est_success = []
+    a_arp_success = []
+    a_est_fail = []
+    a_arp_fail = []
+
+    b_est_success = []
+    b_arp_success = []
+    b_est_fail = []
+    b_arp_fail = []
+
+    # Process results
+    for entry in cmd_results_a:
+        if entry['success']:
+            if entry['rpc'] == 'est':
+                a_est_success.append(entry['mac'])
+            else:
+                a_arp_success.append(entry['ip'])
+        else:
+            if entry['rpc'] == 'est':
+                a_est_fail.append({'address': entry['mac'], 'reason': entry['error']})
+            else:
+                a_arp_fail.append({'address': entry['ip'], 'reason': entry['error']})
+
+    for entry in cmd_results_b:
+        if entry['success']:
+            if entry['rpc'] == 'est':
+                b_est_success.append(entry['mac'])
+            else:
+                b_arp_success.append(entry['ip'])
+        else:
+            if entry['rpc'] == 'est':
+                b_est_fail.append({'address': entry['mac'], 'reason': entry['error']})
+            else:
+                b_arp_fail.append({'address': entry['ip'], 'reason': entry['error']})
 
     # Create config file
     now = get_now_time()
-    clear_conf_name = "clear_results_" + label + "_" + now + ".conf"
-    myresfile = os.path.join(conf_path, clear_conf_name)
+    clear_results = "clear_results_" + label + "_" + now + ".conf"
+    myresfile = os.path.join(conf_path, clear_results)
 
     # Output for the config file
+    print_log("## ****************************", myresfile, True)
     print_log("## CLEAR CONFIGURATION COMMANDS", myresfile, True)
     print_log("## ****************************", myresfile, True)
     print_log("## Host A: " + nameA + " (" + ip1 + ")", myresfile, True)
     print_log("## Host B: " + nameB + " (" + ip2 + ")", myresfile, True)
     print_log("## ****************************", myresfile, True)
+    print_log("## SUMMARY", myresfile, True)
+    print_log("## ***********************************", myresfile, True)
     print_log("## Host A ETHER-SWITCHING Table Clears", myresfile, True)
-    print_log("## -- Successful.... {0}", myresfile, True)
-    print_log("## -- Failed........ {0}", myresfile, True)
+    print_log("## -- Successful.... " + str(len(a_est_success)), myresfile, True)
+    print_log("## -- Failed........ " + str(len(a_est_fail)), myresfile, True)
     print_log("## Host A ARP Table Clears", myresfile, True)
-    print_log("## -- Successful.... {0}", myresfile, True)
-    print_log("## -- Failed........ {0}", myresfile, True)
+    print_log("## -- Successful.... " + str(len(a_arp_success)), myresfile, True)
+    print_log("## -- Failed........ " + str(len(a_arp_fail)), myresfile, True)
     print_log("## Host B ETHER-SWITCHING Table Clears", myresfile, True)
-    print_log("## -- Successful.... {0}", myresfile, True)
-    print_log("## -- Failed........ {0}", myresfile, True)
+    print_log("## -- Successful.... " + str(len(b_est_success)), myresfile, True)
+    print_log("## -- Failed........ " + str(len(b_est_fail)), myresfile, True)
     print_log("## Host B ARP Table Clears", myresfile, True)
-    print_log("## -- Successful.... {0}", myresfile, True)
-    print_log("## -- Failed........ {0}", myresfile, True)
-    print_log("## ****************************", myresfile, True)
+    print_log("## -- Successful.... " + str(len(b_arp_success)), myresfile, True)
+    print_log("## -- Failed........ " + str(len(b_arp_fail)), myresfile, True)
+    print_log("## ***********************************", myresfile, True)
 
-    # Process results
-    for entry in cmd_results_a:
-        pass
-    # Create configuration file with clear commands if applicable
-    if clear_ether_list_both:
-        # Loop ether_list and add commands
-        print_log("##\n## Both entries 'Permanent Remote' or None - Run these commands on both devices.\n##", myresfile, True)
-        for command in clear_ether_list_both:
-            print_log(command, myresfile)
+    # Print out the details of the failed clears, if any
+    print_log("##\n## FAILED ETHER-SWITCHING TABLE CLEARS", myresfile, True)
+    print_log("## Host A:", myresfile, True)
+    if a_est_fail:
+        for entry in a_est_fail:
+            print_log("##\t--" + entry['address'] + " Reason: " + entry['reason'], myresfile, True)
+        print_log("## Host B:", myresfile, True)
+    else:
+        print_log("##\t-- NONE", myresfile, True)
+    for entry in b_est_fail:
+        print_log("##\t--" + entry['address'] + " Reason: " + entry['reason'], myresfile, True)
+    print_log("##\n## FAILED ARP TABLE CLEARS", myresfile, True)
+    print_log("## Host A:", myresfile, True)
+    for entry in a_arp_fail:
+        print_log("##\t--" + entry['address'] + " Reason: " + entry['reason'], myresfile, True)
+    print_log("## Host B:", myresfile, True)
+    for entry in b_arp_fail:
+        print_log("##\t--" + entry['address'] + " Reason: " + entry['reason'], myresfile, True)
 
-    if clear_ether_list_a:
-        # Loop ether_list and add commands
-        print_log("##\n## Exists in ethernet-switching table as permanent|remote on A, not B - Run these commands on " + ip1 + "\n##", myresfile, True)
-        for command in clear_ether_list_a:
-            print_log(command, myresfile)
-
-    if clear_ether_list_b:
-        # Loop ether_list and add commands
-        print_log("##\n## Exists in ethernet-switching table as permanent|remote on B, not A - Run these commands on " + ip2 + "\n##", myresfile, True)
-        for command in clear_ether_list_b:
-            print_log(command, myresfile)
-
-    if clear_arp_list_a:
-        # Loop arp_list and add commands
-        print_log("##\n## Exists in arp table on A, not B - Run these commands on " + ip1 + "\n##", myresfile, True)
-        for command in clear_arp_list_a:
-            print_log(command, myresfile)
-
-    if clear_arp_list_b:
-        # Loop arp_list and add commands
-        print_log("##\n## Exists in arp table on B, not A - Run these commands on " + ip2 + "\n##", myresfile, True)
-        for command in clear_arp_list_b:
-            print_log(command, myresfile)
-    print_log("##", myresfile, False)
+    # Print out the details of the successful clears, if any
+    print_log("##\n## SUCCESSFUL ETHER-SWITCHING TABLE CLEARS", myresfile, True)
+    print_log("## Host A:", myresfile, True)
+    if a_est_success:
+        for entry in a_est_success:
+            print_log("##\t--" + entry, myresfile, True)
+        print_log("## Host B:", myresfile, True)
+    else:
+        print_log("##\t-- NONE", myresfile, True)
+    for entry in b_est_success:
+        print_log("##\t--" + entry, myresfile, True)
+    print_log("##\n## FAILED ARP TABLE CLEARS", myresfile, True)
+    print_log("## Host A:", myresfile, True)
+    for entry in a_arp_success:
+        print_log("##\t--" + entry, myresfile, True)
+    print_log("## Host B:", myresfile, True)
+    for entry in b_arp_success:
+        print_log("##\t--" + entry, myresfile, True)
+    print_log("##", myresfile, True)
 
     # Print file name
-    print "Completed Config File: {0}".format(clear_conf_name)
+    print "Completed Config File: {0}".format(clear_reults)
 
     return myresfile
 
