@@ -10,11 +10,13 @@ import jxmlease
 import getopt
 import time
 import sys
+import types
 
 from jnpr.junos import *
 from jnpr.junos.exception import *
 from netaddr import *
 from utility import *
+from random import *
 
 from ncclient import manager  # https://github.com/ncclient/ncclient
 from ncclient.transport import errors
@@ -309,7 +311,7 @@ def arpscan():
             print "-" * 30
             stdout.write("Pausing for 2 mins...")
             sys.stdout.flush()
-            #time.sleep(120)
+            time.sleep(120)
             print "Done Waiting"
             print "-" * 30
             print subHeading("Running Second Comparison", 5)
@@ -389,13 +391,14 @@ def arpscan():
     # Request clear commands on the appropriate device
     if pushChanges:
         print subHeading("Clearing Detected ARPs", 5)
-        if getTFAnswer("Continue with clearing devices"):
+        if getTFAnswer("Continue with clearing ARP and ETHERNET-SWITCHING entries?"):
             headings = ['RPC', 'Mac', 'IP', 'Result', 'Error']
             keys = ['rpc', 'mac', 'ip', 'result', 'error']
             # Make RPC requests to IP1 device
             #print_listdict(clear_cmds_a, headings, keys)
 
-            #cmd_results_a = push_changes(ip1, clear_cmds_a)
+            cmd_results_a = push_changes(ip1, clear_cmds_a)
+            '''
             cmd_results_a = [{'rpc': 'est', 'mac': '1c:6a:7a:61:06:49', 'success': True},
                              {'rpc': 'est', 'mac': '58:f3:9c:5a:9d:7b', 'success': True},
                              {'rpc': 'arp', 'ip': '10.112.192.63', 'success': True},
@@ -404,17 +407,18 @@ def arpscan():
                              {'rpc': 'arp', 'ip': '10.112.101.22', 'success': True},
                              {'rpc': 'arp', 'ip': '10.112.151.60', 'success': True},
                              {'rpc': 'arp', 'ip': '10.112.133.22', 'success': True}]
-
+            '''
             # Make RPC requests to IP2 device
             #print_listdict(clear_cmds_b, headings, keys)
-            #cmd_results_b = push_changes(ip2, clear_cmds_b)
+            cmd_results_b = push_changes(ip2, clear_cmds_b)
+            '''
             cmd_results_b = [{'rpc': 'est', 'mac': '1c:6a:7a:61:06:49', 'success': True},
                              {'rpc': 'est', 'mac': '58:f3:9c:5a:9d:7b', 'success': True},
                              {'rpc': 'arp', 'ip': '10.112.165.25', 'success': True},
                              {'rpc': 'arp', 'ip': '10.112.165.32', 'success': True},
                              {'rpc': 'arp', 'ip': '10.112.101.21', 'success': True},
                              {'rpc': 'arp', 'ip': '10.112.162.126', 'success': True}]
-
+            '''
             results_file = create_results_file(cmd_results_a, cmd_results_b, label, nameA, nameB)
             # Email Results to Engineers
             email_attachment(results_file, emailfrom, emailto, label + ' - Log')
@@ -424,46 +428,94 @@ def arpscan():
 # A function to run RPC commands against Junipers
 def push_changes(host_ip, clear_cmds):
     cmd_results = []
+    fail_clear_cmds = []
     # Try to connect to the host
     stdout.write("-> Connecting to " + host_ip + " ... ")
     dev = connect(host_ip)
+    dev = True
     if dev:
         print "Connected!"
         # Loop over the dictionary list
         if clear_cmds:
-            for entry in clear_cmds:
-                try:
-                    if entry['rpc'] == 'est':
-                        stdout.write("--> Attempting to clear EST " + entry['mac'] + " ... ")
-                        #rsp = dev.rpc.clear_ethernet_switching_table(mac=entry['mac'])
-                        rsp = True
-                    elif entry['rpc'] == 'arp':
-                        stdout.write("--> Attempting to clear ARP " + entry['ip'] + " ... ")
-                        #rsp = dev.rpc.clear_arp_table(hostname=entry['ip'])
-                        rsp = True
-                except RpcError as err:
-                    print "Failed: RPC Error"
-                    entry['success'] = False
-                    entry['error'] = err
-                except RpcTimeoutError as err:
-                    print "Failed: RPC Timeout Error"
-                    entry['success'] = False
-                    entry['error'] = err
-                except Exception as err:
-                    print "Failed: Unknown Error"
-                    entry['success'] = False
-                    entry['error'] = err
-                else:
-                    if rsp:
-                        print "Successful"
-                        entry['success'] = True
+            loop = 1
+            # Do this loop if its the first or if its less than 5 and has items in the fail_clear_cmds list
+            while loop == 1 or (loop < 5 and clear_cmds):
+                # Loop over clear elements
+                for entry in clear_cmds:
+                    #print entry
+                    try:
+                        if entry['rpc'] == 'est':
+                            if getTFAnswer("Continue clearing ethernet-switching table mac " + entry['mac']):
+                                stdout.write("--> Attempting to clear EST " + entry['mac'] + " (" + str(loop) + ") ... ")
+                                rsp = dev.rpc.clear_ethernet_switching_table(mac=entry['mac'])
+                            else:
+                                loop = 5
+                                break
+                            '''
+                            if randint(0, 1):
+                                rsp = True
+                            else:
+                                rsp = "est: randomly chose false"
+                            '''
+                        else:
+                            if getTFAnswer("Continue clearing ethernet-switching table mac " + entry['ip']):
+                                stdout.write("--> Attempting to clear ARP " + entry['ip'] + " (" + str(loop) + ") ... ")
+                                rsp = dev.rpc.clear_arp_table(hostname=entry['ip'])
+                            else:
+                                loop = 5
+                                break
+                            '''
+                            if randint(0, 1):
+                                rsp = True
+                            else:
+                                rsp = "arp: randomly chose false"
+                            '''
+                    except RpcError as err:
+                        print "Failed: RPC Error"
+                        if loop == 4:
+                            entry['success'] = False
+                            entry['error'] = err
+                            cmd_results.append(entry)
+                            fail_clear_cmds.append(entry)
+                    except RpcTimeoutError as err:
+                        print "Failed: RPC Timeout Error"
+                        if loop == 4:
+                            entry['success'] = False
+                            entry['error'] = err
+                            cmd_results.append(entry)
+                        else:
+                            fail_clear_cmds.append(entry)
+                    except Exception as err:
+                        print "Failed: Unknown Error"
+                        if loop == 4:
+                            entry['success'] = False
+                            entry['error'] = err
+                            cmd_results.append(entry)
+                        else:
+                            fail_clear_cmds.append(entry)
                     else:
-                        rsp = jxmlease.parse_etree(rsp)
-                        entry['success'] = False
-                        etnry['error'] = rsp
-                # Regardless of the result, there should be a result
-
-                cmd_results.append(entry)
+                        # If the response is a string, it's a failure
+                        if type(rsp) != types.BooleanType:
+                            print "Failed: Possible Clear Issue"
+                            if loop == 4:
+                                #rsp = jxmlease.parse_etree(rsp)
+                                entry['success'] = False
+                                entry['error'] = rsp
+                                cmd_results.append(entry)
+                            else:
+                                fail_clear_cmds.append(entry)
+                        # Else the response should be "True"
+                        else:
+                            print "Successful"
+                            entry['success'] = True
+                            entry['loop'] = loop
+                            cmd_results.append(entry)
+                # Replace clear_cmds with the new list (old list minus successful clears)
+                clear_cmds = fail_clear_cmds
+                fail_clear_cmds = []
+                # Increase loop by 1
+                #print "\nIncrease Loop Value\n"
+                loop += 1
         else:
             print "No commands in list!"
     # Return the entries with the results of the clear attempts
@@ -640,9 +692,9 @@ def create_results_file(cmd_results_a, cmd_results_b, label, nameA, nameB):
     for entry in cmd_results_a:
         if entry['success']:
             if entry['rpc'] == 'est':
-                a_est_success.append(entry['mac'])
+                a_est_success.append({'address': entry['mac'], 'loop': entry['loop']})
             else:
-                a_arp_success.append(entry['ip'])
+                a_arp_success.append({'address': entry['ip'], 'loop': entry['loop']})
         else:
             if entry['rpc'] == 'est':
                 a_est_fail.append({'address': entry['mac'], 'reason': entry['error']})
@@ -652,9 +704,9 @@ def create_results_file(cmd_results_a, cmd_results_b, label, nameA, nameB):
     for entry in cmd_results_b:
         if entry['success']:
             if entry['rpc'] == 'est':
-                b_est_success.append(entry['mac'])
+                b_est_success.append({'address': entry['mac'], 'loop': entry['loop']})
             else:
-                b_arp_success.append(entry['ip'])
+                b_arp_success.append({'address': entry['ip'], 'loop': entry['loop']})
         else:
             if entry['rpc'] == 'est':
                 b_est_fail.append({'address': entry['mac'], 'reason': entry['error']})
@@ -717,21 +769,21 @@ def create_results_file(cmd_results_a, cmd_results_b, label, nameA, nameB):
         if a_est_success:
             print_log("## Host A:", myresfile, True)
             for entry in a_est_success:
-                print_log("##\t" + entry, myresfile, True)
+                print_log("##\t" + entry['address'] + " (" + str(entry['loop']) + ")", myresfile, True)
         if b_est_success:
             print_log("## Host B:", myresfile, True)
             for entry in b_est_success:
-                print_log("##\t" + entry, myresfile, True)
+                print_log("##\t" + entry['address'] + " (" + str(entry['loop']) + ")", myresfile, True)
     if a_arp_success or b_arp_success:
         print_log("##\n## SUCCESSFUL ARP TABLE CLEARS", myresfile, True)
         if a_arp_success:
             print_log("## Host A:", myresfile, True)
             for entry in a_arp_success:
-                print_log("##\t" + entry, myresfile, True)
+                print_log("##\t" + entry['address'] + " (" + str(entry['loop']) + ")", myresfile, True)
         if b_arp_success:
             print_log("## Host B:", myresfile, True)
             for entry in b_arp_success:
-                print_log("##\t" + entry, myresfile, True)
+                print_log("##\t" + entry['address'] + " (" + str(entry['loop']) + ")", myresfile, True)
     print_log("##", myresfile, True)
 
     # Print file name
