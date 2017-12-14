@@ -305,7 +305,7 @@ def csvListDict(fileName, keys=''):
     except Exception as err:
         print "Failure converting CSV to listDict - ERROR: {0}".format(err)
     else:
-        print "File Import Complete!"
+        print "Import of '{0}' Successful!".format(fileName)
     return myListDict
 
 # Converts CSV file to Dictionary
