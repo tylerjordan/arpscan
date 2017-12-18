@@ -280,11 +280,11 @@ def arpscan():
 
         # Run comparisons
         # First comparison
-        both_perm_remote_dl_1, both_none_dl_1, mac_discrep_dl_1, remove_mac_on_a_dl_1, record_miss_on_a_dl_1,\
-        remove_mac_on_b_dl_1, record_miss_on_b_dl_1, valid_count_1 = test_compare_capture(router_a_1_ld, router_b_1_ld)
+        both_perm_remote_dl_1, both_none_dl_1, mac_discrep_dl_1, remove_mac_on_a_dl_1, remove_mac_on_b_dl_1,\
+        valid_count_1 = test_compare_capture(router_a_1_ld, router_b_1_ld)
         # Second comparison
-        both_perm_remote_dl_2, both_none_dl_2, mac_discrep_dl_2, remove_mac_on_a_dl_2, record_miss_on_a_dl_2,\
-        remove_mac_on_b_dl_2, record_miss_on_b_dl_2, valid_count_2 = test_compare_capture(router_a_2_ld, router_b_2_ld)
+        both_perm_remote_dl_2, both_none_dl_2, mac_discrep_dl_2, remove_mac_on_a_dl_2, remove_mac_on_b_dl_2,\
+        valid_count_2 = test_compare_capture(router_a_2_ld, router_b_2_ld)
     ####################
     # OPERATIONAL Code
     ####################
@@ -308,8 +308,8 @@ def arpscan():
             #print "Label is {0}".format(label)
 
             print subHeading("Running First Comparison", 5)
-            both_perm_remote_dl_1, both_none_dl_1, mac_discrep_dl_1, remove_mac_on_a_dl_1, record_miss_on_a_dl_1,\
-            remove_mac_on_b_dl_1, record_miss_on_b_dl_1, valid_count_1 = oper_compare_capture()
+            both_perm_remote_dl_1, both_none_dl_1, mac_discrep_dl_1, remove_mac_on_a_dl_1, remove_mac_on_b_dl_1,\
+            valid_count_1 = oper_compare_capture()
             print "-" * 30
             stdout.write("Pausing for 2 mins...")
             sys.stdout.flush()
@@ -317,8 +317,8 @@ def arpscan():
             print "Done Waiting"
             print "-" * 30
             print subHeading("Running Second Comparison", 5)
-            both_perm_remote_dl_2, both_none_dl_2, mac_discrep_dl_2, remove_mac_on_a_dl_2, record_miss_on_a_dl_2,\
-            remove_mac_on_b_dl_2, record_miss_on_b_dl_2, valid_count_2 = oper_compare_capture()
+            both_perm_remote_dl_2, both_none_dl_2, mac_discrep_dl_2, remove_mac_on_a_dl_2, remove_mac_on_b_dl_2,\
+            valid_count_2 = oper_compare_capture()
             print "-" * 30
         else:
             print "Detected Invalid IPv4 Formatted IPs ... exiting"
@@ -332,8 +332,6 @@ def arpscan():
     mac_discr = compare_listdict(mac_discrep_dl_1, mac_discrep_dl_2)
     remove_mac_on_a = compare_listdict(remove_mac_on_a_dl_1, remove_mac_on_a_dl_2)
     remove_mac_on_b = compare_listdict(remove_mac_on_b_dl_1, remove_mac_on_b_dl_2)
-    record_miss_on_a = compare_listdict(record_miss_on_a_dl_1, record_miss_on_a_dl_2)
-    record_miss_on_b = compare_listdict(record_miss_on_b_dl_1, record_miss_on_b_dl_2)
 
     # Clear file parameter lists
     clear_ether_list_perm_remote = []
@@ -366,11 +364,6 @@ def arpscan():
     for arp_entry in remove_mac_on_b:
         clear_ether_list_b.append("clear ethernet-switching table " + arp_entry['mac'] + "\n")
         clear_cmds_b.append({'rpc': 'est', 'mac': arp_entry['mac']})
-    # Entries missing on one side that we only want to record
-    for arp_entry in record_miss_on_a:
-        clear_ether_list_a.append("clear ethernet-switching table " + arp_entry['mac'] + "\n")
-    for arp_entry in record_miss_on_b:
-        clear_ether_list_b.append("clear ethernet-switching table " + arp_entry['mac'] + "\n")
     # Entries that have inconsisent ARP entires (same IP, different MAC)
     for arp_entry in mac_discr:
         clear_arp_list_a.append("clear arp hostname " + arp_entry['ip'] + "\n")
@@ -387,8 +380,8 @@ def arpscan():
     email_attachment(conf_file, emailfrom, emailto, label + ' - Config')
 
     # Print Log Results To File
-    log_file = print_results(both_perm, both_none, mac_discr, remove_mac_on_a, record_miss_on_a, remove_mac_on_b,
-                             record_miss_on_b, valid_count_1, label, nameA, nameB)
+    log_file = print_results(both_perm, both_none, mac_discr, remove_mac_on_a, remove_mac_on_b, valid_count_1, label,
+                             nameA, nameB)
     # Email Log to Engineers
     email_attachment(log_file, emailfrom, emailto, label + ' - Log')
 
@@ -451,7 +444,7 @@ def push_changes(host_ip, clear_cmds):
                         if entry['rpc'] == 'est':
                             if getTFAnswer("Continue clearing ethernet-switching table mac " + entry['mac']):
                                 stdout.write("--> Attempting to clear EST " + entry['mac'] + " (" + str(loop) + ") ... ")
-                                rsp = dev.rpc.clear_ethernet_switching_table(mac=entry['mac'])
+                                #rsp = dev.rpc.clear_ethernet_switching_table(mac=entry['mac'])
                             else:
                                 loop = loop_max + 1
                                 break
@@ -462,9 +455,9 @@ def push_changes(host_ip, clear_cmds):
                                 rsp = "est: randomly chose false"
                             '''
                         else:
-                            if getTFAnswer("Continue clearing ethernet-switching table mac " + entry['ip']):
+                            if getTFAnswer("Continue clearing arp table IP " + entry['ip']):
                                 stdout.write("--> Attempting to clear ARP " + entry['ip'] + " (" + str(loop) + ") ... ")
-                                rsp = dev.rpc.clear_arp_table(hostname=entry['ip'])
+                                #rsp = dev.rpc.clear_arp_table(hostname=entry['ip'])
                             else:
                                 loop = loop_max + 1
                                 break
@@ -502,7 +495,7 @@ def push_changes(host_ip, clear_cmds):
                         if type(rsp) != types.BooleanType:
                             print "Failed: Possible Clear Issue"
                             if loop == loop_max:
-                                #rsp = jxmlease.parse_etree(rsp)
+                                rsp = jxmlease.parse_etree(rsp)
                                 entry['success'] = False
                                 entry['error'] = rsp
                                 cmd_results.append(entry)
@@ -548,10 +541,9 @@ def test_compare_capture(router_a_ld, router_b_ld):
             arp_mac_listdict2 = filter_excluded_arps(router_b_ld)
             print "Completed filtering ARPs for B."
             # Run comparison function and print results and commands
-            both_perm_remote_dl, both_none_dl, mac_discrep_dl, remove_mac_on_a_dl, record_miss_on_a_dl,\
-            remove_mac_on_b_dl, record_miss_on_b_dl, valid_count = compare_arp_tables(arp_mac_listdict1, arp_mac_listdict2, ip1, ip2)
-            return both_perm_remote_dl, both_none_dl, mac_discrep_dl, remove_mac_on_a_dl, record_miss_on_a_dl,\
-                   remove_mac_on_b_dl, record_miss_on_b_dl, valid_count
+            both_perm_remote_dl, both_none_dl, mac_discrep_dl, remove_mac_on_a_dl, remove_mac_on_b_dl,\
+            valid_count = compare_arp_tables(arp_mac_listdict1, arp_mac_listdict2, ip1, ip2)
+            return both_perm_remote_dl, both_none_dl, mac_discrep_dl, remove_mac_on_a_dl, remove_mac_on_b_dl, valid_count
         else:
             print "Invalid ARP table for B"
     else:
@@ -578,10 +570,9 @@ def oper_compare_capture():
             arp_mac_listdict2 = filter_excluded_arps(arp_mac_listdict2)
             print "--> Completed filtering ARP table"
             # Run comparison function and print results and commands
-            both_perm_remote_dl, both_none_dl, mac_discrep_dl, remove_mac_on_a_dl, record_miss_on_a_dl,\
-            remove_mac_on_b_dl, record_miss_on_b_dl, valid_count = compare_arp_tables(arp_mac_listdict1, arp_mac_listdict2, ip1, ip2)
-            return both_perm_remote_dl, both_none_dl, mac_discrep_dl, remove_mac_on_a_dl, record_miss_on_a_dl,\
-                   remove_mac_on_b_dl, record_miss_on_b_dl, valid_count
+            both_perm_remote_dl, both_none_dl, mac_discrep_dl, remove_mac_on_a_dl, remove_mac_on_b_dl,\
+            valid_count = compare_arp_tables(arp_mac_listdict1, arp_mac_listdict2, ip1, ip2)
+            return both_perm_remote_dl, both_none_dl, mac_discrep_dl, remove_mac_on_a_dl, remove_mac_on_b_dl, valid_count
         else:
             print("Failed to retrieve ARP table on {0} ... exiting").format(ip2)
             exit()
@@ -603,8 +594,6 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
 
     remove_mac_on_a_dl = []         # Format: 'ip', 'mac', 'flag'
     remove_mac_on_b_dl = []         # Format: 'ip', 'mac', 'flag'
-    record_miss_on_a_dl = []        # Format: 'ip', 'mac', 'flag'
-    record_miss_on_b_dl = []        # Format: 'ip', 'mac', 'flag'
 
     # Compares A against B
     for arp1 in arptab1:
@@ -647,16 +636,13 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
                 # We don't care about permanent flagged ARPs
                 if arp1['flag'] == 'permanent':
                     pass
-                # Capture these entries, need to remove MAC on B side
-                elif arp1['flag'] == 'perm_remote':
-                    remove_mac_on_b_dl.append(arp1)
                 # Capture all other entries with a missing ARP on side B
                 else:
-                    record_miss_on_b_dl.append(arp1)
+                    remove_mac_on_b_dl.append(arp1)
             # If flag value is missing
             else:
                 print "ERROR: On {0} -> Missing Flag for IP: {1}".format(ip1, arp1['ip'])
-                record_miss_on_b_dl.append(arp1)
+                remove_mac_on_b_dl.append(arp1)
     # Compares B against A
     for arp2 in arptab2:
         no_ip_match = True
@@ -674,19 +660,15 @@ def compare_arp_tables(arptab1, arptab2, ip1, ip2):
                 # We don't care about permanent flagged ARPs
                 if arp2['flag'] == 'permanent':
                     pass
-                # Capture these entries, need to remove MAC on A side
-                elif arp2['flag'] == 'perm_remote':
-                    remove_mac_on_a_dl.append(arp2)
                 # Capture all other entries with a missing ARP on side A
                 else:
-                    record_miss_on_a_dl.append(arp2)
+                    remove_mac_on_a_dl.append(arp2)
             # If flag value is missing
             else:
                 print "ERROR: On {0} -> Missing Flag for IP: {1}".format(ip2, arp2['ip'])
-                record_miss_on_a_dl.append(arp2)
+                remove_mac_on_a_dl.append(arp2)
     # Return all lists of dictionaries as a list
-    return both_perm_remote_dl, both_none_dl, mac_discrep_dl, remove_mac_on_a_dl, record_miss_on_a_dl,\
-           remove_mac_on_b_dl, record_miss_on_b_dl, valid_count
+    return both_perm_remote_dl, both_none_dl, mac_discrep_dl, remove_mac_on_a_dl, remove_mac_on_b_dl, valid_count
 
 def create_results_file(cmd_results_a, cmd_results_b, label, nameA, nameB):
     # Storage Variables
@@ -740,17 +722,17 @@ def create_results_file(cmd_results_a, cmd_results_b, label, nameA, nameB):
     print_log("## SUMMARY", myresfile, True)
     print_log("## ***********************************", myresfile, True)
     print_log("## Host A ETHER-SWITCHING Table Clears", myresfile, True)
-    print_log("## -- Successful.... " + str(len(a_est_success)), myresfile, True)
-    print_log("## -- Failed........ " + str(len(a_est_fail)), myresfile, True)
+    print_log("## -- Successful .... " + str(len(a_est_success)), myresfile, True)
+    print_log("## -- Failed ........ " + str(len(a_est_fail)), myresfile, True)
     print_log("## Host A ARP Table Clears", myresfile, True)
-    print_log("## -- Successful.... " + str(len(a_arp_success)), myresfile, True)
-    print_log("## -- Failed........ " + str(len(a_arp_fail)), myresfile, True)
+    print_log("## -- Successful .... " + str(len(a_arp_success)), myresfile, True)
+    print_log("## -- Failed ........ " + str(len(a_arp_fail)), myresfile, True)
     print_log("## Host B ETHER-SWITCHING Table Clears", myresfile, True)
-    print_log("## -- Successful.... " + str(len(b_est_success)), myresfile, True)
-    print_log("## -- Failed........ " + str(len(b_est_fail)), myresfile, True)
+    print_log("## -- Successful .... " + str(len(b_est_success)), myresfile, True)
+    print_log("## -- Failed ........ " + str(len(b_est_fail)), myresfile, True)
     print_log("## Host B ARP Table Clears", myresfile, True)
-    print_log("## -- Successful.... " + str(len(b_arp_success)), myresfile, True)
-    print_log("## -- Failed........ " + str(len(b_arp_fail)), myresfile, True)
+    print_log("## -- Successful .... " + str(len(b_arp_success)), myresfile, True)
+    print_log("## -- Failed ........ " + str(len(b_arp_fail)), myresfile, True)
     print_log("## ***********************************", myresfile, True)
 
     # Print out the details of the failed clears, if any
@@ -817,14 +799,14 @@ def create_conf_file(clear_ether_list_perm_remote, clear_ether_list_none, clear_
     print_log("## ****************************", myconfile, True)
     print_log("## Host A: " + nameA + " (" + ip1 + ")", myconfile, True)
     print_log("## Host B: " + nameB + " (" + ip2 + ")", myconfile, True)
-    print_log("## ****************************", myconfile, True)
-    print_log("## Both entries 'PERMANENT REMOTE': " + str(len(clear_ether_list_perm_remote)), myconfile, True)
-    print_log("## Both entries 'NONE': " + str(len(clear_ether_list_none)), myconfile, True)
-    print_log("## Entries in ETHER-SWITCHING on A, not B: " + str(len(clear_ether_list_a)), myconfile, True)
-    print_log("## Entries in ETHER-SWITCHING on B, not A: " + str(len(clear_ether_list_b)), myconfile, True)
-    print_log("## Entries in ARP on A, not B: " + str(len(clear_arp_list_a)), myconfile, True)
-    print_log("## Entries in ARP on B, not A: " + str(len(clear_arp_list_b)), myconfile, True)
-    print_log("## ****************************", myconfile, True)
+    print_log("## ***********************************************", myconfile, True)
+    print_log("## Both entries 'PERMANENT REMOTE' .......... " + str(len(clear_ether_list_perm_remote)), myconfile, True)
+    print_log("## Both entries 'NONE' ...................... " + str(len(clear_ether_list_none)), myconfile, True)
+    print_log("## Entries in ETHER-SWITCHING on A, not B ... " + str(len(clear_ether_list_a)), myconfile, True)
+    print_log("## Entries in ETHER-SWITCHING on B, not A ... " + str(len(clear_ether_list_b)), myconfile, True)
+    print_log("## Entries in ARP on A, not B ............... " + str(len(clear_arp_list_a)), myconfile, True)
+    print_log("## Entries in ARP on B, not A ............... " + str(len(clear_arp_list_b)), myconfile, True)
+    print_log("## ***********************************************", myconfile, True)
 
     # Create configuration file with clear commands if applicable
     if clear_ether_list_perm_remote:
@@ -969,8 +951,8 @@ def arp_commands(arp_clear=None, ethsw_clear=None):
     else:
         print "\n!! Configuration deployment aborted... No IPs defined !!!\n"
 
-def print_results(both_perm_remote_dl, both_none_dl, mac_discrep_dl, remove_mac_on_a_dl, record_miss_on_a_dl,
-                  remove_mac_on_b_dl, record_miss_on_b_dl, valid_count, label, nameA, nameB):
+def print_results(both_perm_remote_dl, both_none_dl, mac_discrep_dl, remove_mac_on_a_dl,
+                  remove_mac_on_b_dl, valid_count, label, nameA, nameB):
     # Create log file
     now = get_now_time()
     log_name = "log_output_" + label + "_" + now + ".log"
@@ -1010,7 +992,7 @@ def print_results(both_perm_remote_dl, both_none_dl, mac_discrep_dl, remove_mac_
     else:
         print_log("\tNo Matches Found", mylogfile, True)
     # Show ARPS that are on A, but not on B
-    complete_b_dl = remove_mac_on_b_dl + record_miss_on_b_dl
+    complete_b_dl = remove_mac_on_b_dl
     print_log("-"*100, mylogfile, True)
     print_log("- ARPs on A, NOT on B -", mylogfile, True)
     print_log("-"*100, mylogfile, True)
@@ -1021,7 +1003,7 @@ def print_results(both_perm_remote_dl, both_none_dl, mac_discrep_dl, remove_mac_
     else:
         print_log("\tNo Matches Found", mylogfile, True)
     # Show ARPS that are on B, but not on A
-    complete_a_dl = remove_mac_on_a_dl + record_miss_on_a_dl
+    complete_a_dl = remove_mac_on_a_dl
     print_log("-"*100, mylogfile, True)
     print_log("- ARPs on B, NOT on A -", mylogfile, True)
     print_log("-"*100, mylogfile, True)
