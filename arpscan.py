@@ -468,7 +468,7 @@ def push_changes(host_ip, clear_cmds):
                                 rsp = "arp: randomly chose false"
                             '''
                     except RpcError as err:
-                        print "Failed: RPC Error"
+                        print "Failed: RPC Error: " + err
                         if loop == loop_max:
                             entry['success'] = False
                             entry['error'] = err
