@@ -444,7 +444,7 @@ def push_changes(host_ip, clear_cmds):
                         if entry['rpc'] == 'est':
                             if getTFAnswer("Continue clearing ethernet-switching table mac " + entry['mac']):
                                 stdout.write("--> Attempting to clear EST " + entry['mac'] + " (" + str(loop) + ") ... ")
-                                #rsp = dev.rpc.clear_ethernet_switching_table(mac=entry['mac'])
+                                rsp = dev.rpc.clear_ethernet_switching_table(mac=entry['mac'])
                             else:
                                 loop = loop_max + 1
                                 break
@@ -457,7 +457,7 @@ def push_changes(host_ip, clear_cmds):
                         else:
                             if getTFAnswer("Continue clearing arp table IP " + entry['ip']):
                                 stdout.write("--> Attempting to clear ARP " + entry['ip'] + " (" + str(loop) + ") ... ")
-                                #rsp = dev.rpc.clear_arp_table(hostname=entry['ip'])
+                                rsp = dev.rpc.clear_arp_table(hostname=entry['ip'])
                             else:
                                 loop = loop_max + 1
                                 break
