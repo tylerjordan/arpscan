@@ -469,6 +469,9 @@ def push_changes(host_ip, clear_cmds):
                             '''
                     except RpcError as err:
                         print "Failed: RPC Error: " + err
+                        print "Try to print RSP output..."
+                        rsp = jxmlease.parse_etree(rsp)
+                        print "RSP Output: " + rsp
                         if loop == loop_max:
                             entry['success'] = False
                             entry['error'] = err
