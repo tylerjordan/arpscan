@@ -444,7 +444,7 @@ def push_changes(host_ip, clear_cmds):
                         if entry['rpc'] == 'est':
                             if getTFAnswer("Continue clearing ethernet-switching table mac " + entry['mac']):
                                 stdout.write("--> Attempting to clear EST " + entry['mac'] + " (" + str(loop) + ") ... ")
-                                rsp = dev.rpc.clear_ethernet_switching_table(mac=entry['mac'])
+                                rsp = dev.rpc.clear_ethernet_switching_table(address=entry['mac'])
                             else:
                                 loop = loop_max + 1
                                 break
@@ -475,7 +475,7 @@ def push_changes(host_ip, clear_cmds):
                             cmd_results.append(entry)
                             fail_clear_cmds.append(entry)
                     except RpcTimeoutError as err:
-                        print "Failed: RPC Timeout Error"
+                        print "Failed: RPC Timeout Error: {0}".format(str(err))
                         if loop == loop_max:
                             entry['success'] = False
                             entry['error'] = err
@@ -483,7 +483,7 @@ def push_changes(host_ip, clear_cmds):
                         else:
                             fail_clear_cmds.append(entry)
                     except Exception as err:
-                        print "Failed: Unknown Error"
+                        print "Failed: Unknown Error: {0}".format(str(err))
                         if loop == loop_max:
                             entry['success'] = False
                             entry['error'] = err
