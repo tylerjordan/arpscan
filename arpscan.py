@@ -471,14 +471,14 @@ def push_changes(host_ip, clear_cmds):
                         print "Failed: RPC Error: {0}".format(str(err))
                         if loop == loop_max:
                             entry['success'] = False
-                            entry['error'] = err
+                            entry['error'] = str(err)
                             cmd_results.append(entry)
                             fail_clear_cmds.append(entry)
                     except RpcTimeoutError as err:
                         print "Failed: RPC Timeout Error: {0}".format(str(err))
                         if loop == loop_max:
                             entry['success'] = False
-                            entry['error'] = err
+                            entry['error'] = str(err)
                             cmd_results.append(entry)
                         else:
                             fail_clear_cmds.append(entry)
@@ -486,7 +486,7 @@ def push_changes(host_ip, clear_cmds):
                         print "Failed: Unknown Error: {0}".format(str(err))
                         if loop == loop_max:
                             entry['success'] = False
-                            entry['error'] = err
+                            entry['error'] = str(err)
                             cmd_results.append(entry)
                         else:
                             fail_clear_cmds.append(entry)
