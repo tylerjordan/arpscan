@@ -388,38 +388,38 @@ def arpscan():
     # Request clear commands on the appropriate device
     if pushChanges:
         print subHeading("Clearing Detected ARPs", 5)
-        if getTFAnswer("Continue with clearing ARP and ETHERNET-SWITCHING entries?"):
-            headings = ['RPC', 'Mac', 'IP', 'Result', 'Error']
-            keys = ['rpc', 'mac', 'ip', 'result', 'error']
-            # Make RPC requests to IP1 device
-            #print_listdict(clear_cmds_a, headings, keys)
-            cmd_results_a = push_changes(ip1, clear_cmds_a)
-            '''
-            cmd_results_a = [{'rpc': 'est', 'mac': '1c:6a:7a:61:06:49', 'success': True},
-                             {'rpc': 'est', 'mac': '58:f3:9c:5a:9d:7b', 'success': True},
-                             {'rpc': 'arp', 'ip': '10.112.192.63', 'success': True},
-                             {'rpc': 'arp', 'ip': '10.117.18.99', 'success': True},
-                             {'rpc': 'arp', 'ip': '10.112.101.20', 'success': True},
-                             {'rpc': 'arp', 'ip': '10.112.101.22', 'success': True},
-                             {'rpc': 'arp', 'ip': '10.112.151.60', 'success': True},
-                             {'rpc': 'arp', 'ip': '10.112.133.22', 'success': True}]
-            '''
-            # Make RPC requests to IP2 device
-            #print_listdict(clear_cmds_b, headings, keys)
-            cmd_results_b = push_changes(ip2, clear_cmds_b)
-            '''
-            cmd_results_b = [{'rpc': 'est', 'mac': '1c:6a:7a:61:06:49', 'success': True},
-                             {'rpc': 'est', 'mac': '58:f3:9c:5a:9d:7b', 'success': True},
-                             {'rpc': 'arp', 'ip': '10.112.165.25', 'success': True},
-                             {'rpc': 'arp', 'ip': '10.112.165.32', 'success': True},
-                             {'rpc': 'arp', 'ip': '10.112.101.21', 'success': True},
-                             {'rpc': 'arp', 'ip': '10.112.162.126', 'success': True}]
-            '''
-            results_file = create_results_file(cmd_results_a, cmd_results_b, label, nameA, nameB)
-            # Email Results to Engineers
-            email_attachment(results_file, emailfrom, emailto, label + ' - Log')
+        #if getTFAnswer("Continue with clearing ARP and ETHERNET-SWITCHING entries?"):
+        headings = ['RPC', 'Mac', 'IP', 'Result', 'Error']
+        keys = ['rpc', 'mac', 'ip', 'result', 'error']
+        # Make RPC requests to IP1 device
+        #print_listdict(clear_cmds_a, headings, keys)
+        cmd_results_a = push_changes(ip1, clear_cmds_a)
+        '''
+        cmd_results_a = [{'rpc': 'est', 'mac': '1c:6a:7a:61:06:49', 'success': True},
+                         {'rpc': 'est', 'mac': '58:f3:9c:5a:9d:7b', 'success': True},
+                         {'rpc': 'arp', 'ip': '10.112.192.63', 'success': True},
+                         {'rpc': 'arp', 'ip': '10.117.18.99', 'success': True},
+                         {'rpc': 'arp', 'ip': '10.112.101.20', 'success': True},
+                         {'rpc': 'arp', 'ip': '10.112.101.22', 'success': True},
+                         {'rpc': 'arp', 'ip': '10.112.151.60', 'success': True},
+                         {'rpc': 'arp', 'ip': '10.112.133.22', 'success': True}]
+        '''
+        # Make RPC requests to IP2 device
+        #print_listdict(clear_cmds_b, headings, keys)
+        cmd_results_b = push_changes(ip2, clear_cmds_b)
+        '''
+        cmd_results_b = [{'rpc': 'est', 'mac': '1c:6a:7a:61:06:49', 'success': True},
+                         {'rpc': 'est', 'mac': '58:f3:9c:5a:9d:7b', 'success': True},
+                         {'rpc': 'arp', 'ip': '10.112.165.25', 'success': True},
+                         {'rpc': 'arp', 'ip': '10.112.165.32', 'success': True},
+                         {'rpc': 'arp', 'ip': '10.112.101.21', 'success': True},
+                         {'rpc': 'arp', 'ip': '10.112.162.126', 'success': True}]
+        '''
+        results_file = create_results_file(cmd_results_a, cmd_results_b, label, nameA, nameB)
+        # Email Results to Engineers
+        email_attachment(results_file, emailfrom, emailto, label + ' - Log')
 
-    print "-" * 30
+print "-" * 30
 
 # A function to run RPC commands against Junipers
 def push_changes(host_ip, clear_cmds):
@@ -442,6 +442,9 @@ def push_changes(host_ip, clear_cmds):
                     #print entry
                     try:
                         if entry['rpc'] == 'est':
+                            stdout.write("--> Attempting to clear EST " + entry['mac'] + " (" + str(loop) + ") ... ")
+                            rsp = dev.rpc.clear_ethernet_switching_table(address=entry['mac'])
+                            '''
                             if getTFAnswer("Continue clearing ethernet-switching table mac " + entry['mac']):
                                 stdout.write("--> Attempting to clear EST " + entry['mac'] + " (" + str(loop) + ") ... ")
                                 rsp = dev.rpc.clear_ethernet_switching_table(address=entry['mac'])
@@ -453,8 +456,10 @@ def push_changes(host_ip, clear_cmds):
                                 rsp = True
                             else:
                                 rsp = "est: randomly chose false"
-                            '''
                         else:
+                            stdout.write("--> Attempting to clear ARP " + entry['ip'] + " (" + str(loop) + ") ... ")
+                            rsp = dev.rpc.clear_arp_table(hostname=entry['ip'])
+                            '''
                             if getTFAnswer("Continue clearing arp table IP " + entry['ip']):
                                 stdout.write("--> Attempting to clear ARP " + entry['ip'] + " (" + str(loop) + ") ... ")
                                 rsp = dev.rpc.clear_arp_table(hostname=entry['ip'])
@@ -466,7 +471,7 @@ def push_changes(host_ip, clear_cmds):
                                 rsp = True
                             else:
                                 rsp = "arp: randomly chose false"
-                            '''
+
                     except RpcError as err:
                         print "Failed: RPC Error: {0}".format(str(err))
                         if loop == loop_max:
